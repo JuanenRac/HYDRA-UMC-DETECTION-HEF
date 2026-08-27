@@ -1,0 +1,2 @@
+[console_scripts]
+hydra-umc-detection-hef = hydra_umc_detection_hef.main:main

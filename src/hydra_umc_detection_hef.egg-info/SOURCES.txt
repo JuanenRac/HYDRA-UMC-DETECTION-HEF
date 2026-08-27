@@ -1,0 +1,10 @@
+LICENSE.md
+README.md
+pyproject.toml
+src/hydra_umc_detection_hef/__init__.py
+src/hydra_umc_detection_hef/main.py
+src/hydra_umc_detection_hef.egg-info/PKG-INFO
+src/hydra_umc_detection_hef.egg-info/SOURCES.txt
+src/hydra_umc_detection_hef.egg-info/dependency_links.txt
+src/hydra_umc_detection_hef.egg-info/entry_points.txt
+src/hydra_umc_detection_hef.egg-info/top_level.txt

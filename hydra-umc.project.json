@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "ecosystem": "HYDRA-UMC",
+  "name": "HYDRA-UMC-DETECTION-HEF",
+  "version": "0.0.2",
+  "role": "library",
+  "stack": "python",
+  "technologies": [
+    "Python",
+    "Hailo SDK",
+    "YOLOv10 .hef models"
+  ],
+  "deployment_target": "cm5",
+  "maturity": "scaffolding",
+  "family": "Vision AI Node",
+  "parent": "HYDRA-UMC-VISION-NODE",
+  "build": "Requires Hailo runtime/SDK on the real CM5.",
+  "notes": "Scaffolding stage: real entry point only - the compiled-model library itself is future work, needs real Hailo hardware to build against.",
+  "native_version": {
+    "file": "pyproject.toml",
+    "pattern": "^version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\""
+  }
+}
