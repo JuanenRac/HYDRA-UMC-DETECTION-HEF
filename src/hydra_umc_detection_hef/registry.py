@@ -1,0 +1,130 @@
+# =============================================================================
+# HYDRA-UMC-DETECTION-HEF - src/hydra_umc_detection_hef/registry.py
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0 - see LICENSE
+# =============================================================================
+"""Compiled-model registry: versioning and integrity checking of .hef models.
+
+Compiling and versioning models is a data/ML workflow, separate from the
+Hailo Dataflow Compiler toolchain itself (which needs the real Hailo SDK
+and hardware to run) - this is the part of that workflow that's pure file
+and metadata bookkeeping, so it can be written and tested without either.
+The registry file this reads is meant to travel with a build's compiled
+.hef outputs; HYDRA-UMC-VISION-NODE (the integration parent) is the
+consumer that picks the right entry off it at deploy time.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+_VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+
+
+class RegistryError(ValueError):
+    """Raised for a malformed registry file or entry."""
+
+
+@dataclass(frozen=True)
+class ModelEntry:
+    name: str
+    version: str
+    task: str
+    input_shape: tuple[int, ...]
+    classes: tuple[str, ...]
+    hef_path: str
+    sha256: str
+
+    @property
+    def version_tuple(self) -> tuple[int, int, int]:
+        match = _VERSION_RE.match(self.version)
+        if match is None:
+            raise RegistryError(f"malformed version {self.version!r} for model {self.name!r}")
+        return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+
+def _parse_entry(raw: dict, index: int) -> ModelEntry:
+    required = ("name", "version", "task", "input_shape", "classes", "hef_path", "sha256")
+    missing = [field for field in required if field not in raw]
+    if missing:
+        raise RegistryError(f"entry {index}: missing field(s) {missing}")
+
+    if not raw["name"]:
+        raise RegistryError(f"entry {index}: name must not be empty")
+    if _VERSION_RE.match(raw["version"]) is None:
+        raise RegistryError(f"entry {index}: version {raw['version']!r} must look like X.Y.Z")
+    if not raw["task"]:
+        raise RegistryError(f"entry {index}: task must not be empty")
+
+    input_shape = tuple(raw["input_shape"])
+    if not input_shape or any(not isinstance(d, int) or d <= 0 for d in input_shape):
+        raise RegistryError(f"entry {index}: input_shape must be non-empty positive integers")
+
+    classes = tuple(raw["classes"])
+    if not classes:
+        raise RegistryError(f"entry {index}: classes must not be empty")
+
+    if not raw["hef_path"]:
+        raise RegistryError(f"entry {index}: hef_path must not be empty")
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", raw["sha256"]):
+        raise RegistryError(f"entry {index}: sha256 must be a 64-char hex digest")
+
+    return ModelEntry(
+        name=raw["name"], version=raw["version"], task=raw["task"],
+        input_shape=input_shape, classes=classes,
+        hef_path=raw["hef_path"], sha256=raw["sha256"].lower(),
+    )
+
+
+def load_registry(path: Path) -> list[ModelEntry]:
+    """Parse a registry JSON file: a top-level list of model entries."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RegistryError(f"could not read registry {path}: {exc}") from exc
+    if not isinstance(raw, list):
+        raise RegistryError(f"registry {path} must be a JSON array of entries")
+    return [_parse_entry(item, i) for i, item in enumerate(raw)]
+
+
+def duplicate_versions(entries: list[ModelEntry]) -> list[tuple[str, str]]:
+    """(name, version) pairs that appear more than once - a registry bug."""
+    seen: dict[tuple[str, str], int] = {}
+    for entry in entries:
+        key = (entry.name, entry.version)
+        seen[key] = seen.get(key, 0) + 1
+    return sorted(key for key, count in seen.items() if count > 1)
+
+
+def find_latest(entries: list[ModelEntry], name: str, task: str | None = None) -> ModelEntry | None:
+    """The highest-version entry matching name (and task, if given)."""
+    candidates = [e for e in entries if e.name == name and (task is None or e.task == task)]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda e: e.version_tuple)
+
+
+def compute_sha256(file_path: Path) -> str:
+    digest = hashlib.sha256()
+    with file_path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_checksum(entry: ModelEntry, models_dir: Path) -> bool | None:
+    """True/False if the file was found and checked, None if it's absent.
+
+    None (rather than a hard failure) matters here: a registry describes
+    models that may live in a separate object store, not necessarily
+    checked into this repo, so a missing local file isn't automatically a
+    corrupt registry - only a mismatched checksum for a file that *is*
+    present is.
+    """
+    file_path = models_dir / entry.hef_path
+    if not file_path.is_file():
+        return None
+    return compute_sha256(file_path) == entry.sha256

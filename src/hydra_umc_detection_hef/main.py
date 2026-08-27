@@ -5,15 +5,20 @@
 # =============================================================================
 """Entry point for HYDRA-UMC-DETECTION-HEF.
 
-Skeleton stage: prints identity and exits 0. Real toolchain logic (ONNX
-export, Hailo Dataflow Compiler quantization, HAR/HEF packaging, model
-registry/versioning) lands when this project's turn comes up in
-SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt.
+Real v0: the model registry/versioning half of the toolchain
+(registry.py) - parsing, validating, and checksumming a JSON registry of
+compiled .hef models, independent of the Hailo SDK and hardware needed
+to actually produce one. ONNX export and Hailo Dataflow Compiler
+quantization still need that real hardware and land later.
 """
 from __future__ import annotations
 
+import argparse
 import sys
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+
+from .registry import RegistryError, duplicate_versions, find_latest, load_registry, verify_checksum
 
 PROJECT_NAME = "HYDRA-UMC-DETECTION-HEF"
 DIST_NAME = "hydra-umc-detection-hef"
@@ -37,14 +42,93 @@ def get_version() -> str:
         return "0.0.0-dev (package not installed - run build.sh/build.bat first)"
 
 
-def main() -> int:
-    # Skeleton stage on purpose: this is the whole entry point today. It
-    # confirms the package installs, imports and runs cleanly end to end
-    # before the real ONNX/Dataflow-Compiler/HEF toolchain is built on
-    # top of it.
-    print(f"{PROJECT_NAME} v{get_version()}")
-    print(ROLE)
+def _cmd_registry_validate(args: argparse.Namespace) -> int:
+    try:
+        entries = load_registry(Path(args.registry))
+    except RegistryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"{len(entries)} entr{'y' if len(entries) == 1 else 'ies'} in {args.registry}")
+
+    dupes = duplicate_versions(entries)
+    if dupes:
+        for name, ver in dupes:
+            print(f"error: duplicate entry for {name} {ver}", file=sys.stderr)
+        return 1
+
+    if args.models_dir is not None:
+        models_dir = Path(args.models_dir)
+        mismatches = 0
+        for entry in entries:
+            result = verify_checksum(entry, models_dir)
+            if result is None:
+                print(f"  {entry.name} {entry.version}: {entry.hef_path} not present locally, skipped")
+            elif result:
+                print(f"  {entry.name} {entry.version}: checksum OK")
+            else:
+                print(f"  {entry.name} {entry.version}: CHECKSUM MISMATCH", file=sys.stderr)
+                mismatches += 1
+        if mismatches:
+            return 1
+
+    print("registry OK")
     return 0
+
+
+def _cmd_registry_latest(args: argparse.Namespace) -> int:
+    try:
+        entries = load_registry(Path(args.registry))
+    except RegistryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    entry = find_latest(entries, args.name, args.task)
+    if entry is None:
+        print(f"no model named {args.name!r}" + (f" with task {args.task!r}" if args.task else ""), file=sys.stderr)
+        return 1
+
+    print(f"{entry.name} {entry.version}  task={entry.task}  input_shape={entry.input_shape}")
+    print(f"classes: {', '.join(entry.classes)}")
+    print(f"hef_path: {entry.hef_path}")
+    print(f"sha256: {entry.sha256}")
+    return 0
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="hydra-umc-detection-hef")
+    subparsers = parser.add_subparsers(dest="command")
+
+    registry = subparsers.add_parser("registry", help="Inspect the compiled-model registry.")
+    registry_sub = registry.add_subparsers(dest="registry_command", required=True)
+
+    validate = registry_sub.add_parser("validate", help="Validate registry structure and (optionally) checksums.")
+    validate.add_argument("--registry", required=True, help="Path to the registry JSON file")
+    validate.add_argument("--models-dir", default=None, help="Directory to verify .hef checksums against, if present")
+    validate.set_defaults(func=_cmd_registry_validate)
+
+    latest = registry_sub.add_parser("latest", help="Print the latest registered version of a model.")
+    latest.add_argument("--registry", required=True, help="Path to the registry JSON file")
+    latest.add_argument("--name", required=True, help="Model name to look up")
+    latest.add_argument("--task", default=None, help="Restrict to this task (e.g. detection, pose)")
+    latest.set_defaults(func=_cmd_registry_latest)
+
+    return parser
+
+
+def main() -> int:
+    parser = _build_parser()
+    args = parser.parse_args()
+
+    if args.command is None:
+        # Skeleton stage identity print, still the default bare invocation:
+        # confirms the package installs, imports and runs cleanly end to
+        # end before/alongside the real ONNX/Dataflow-Compiler toolchain.
+        print(f"{PROJECT_NAME} v{get_version()}")
+        print(ROLE)
+        return 0
+
+    return args.func(args)
 
 
 if __name__ == "__main__":

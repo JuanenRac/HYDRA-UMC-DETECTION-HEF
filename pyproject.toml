@@ -1,16 +1,19 @@
 [project]
 name = "hydra-umc-detection-hef"
-version = "0.0.2"
+version = "0.0.3"
 description = "Library and toolchain of hardware-accelerated YOLO detection models compiled to Hailo Executable Format (HEF), tuned for industrial micro-factory inspection on Hailo-8/Hailo-10."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "GPL-3.0-only" }
 authors = [{ name = "JuanenRac", email = "electrohobby3d@gmail.com" }]
-# No runtime dependencies yet - this is the skeleton stage (see
-# SONNET/HYDRA-UMC-DETECTION-HEF/mejoras_futuras.txt). Planned once real
-# business logic lands: hailo-dataflow-compiler (HAR/HEF compilation),
+# No runtime dependencies yet - the v0 model registry (registry.py) uses
+# only the stdlib (json, hashlib). Still planned once the rest of the
+# toolchain lands: hailo-dataflow-compiler (HAR/HEF compilation),
 # ultralytics (YOLOv8/v10 export), onnx (intermediate export format).
 dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
 
 [project.scripts]
 hydra-umc-detection-hef = "hydra_umc_detection_hef.main:main"

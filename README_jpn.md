@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Licencia-GPL%203.0-blue.svg" alt="GPL 3.0">
   <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="HEF">
   <img src="https://img.shields.io/badge/Models-YOLOv8%20%2F%20YOLOv10-00A4EF.svg" alt="YOLO">
-  <img src="https://img.shields.io/badge/Stage-Skeleton-lightgrey.svg" alt="Skeleton stage">
+  <img src="https://img.shields.io/badge/Stage-Functional%20v0-green.svg" alt="Functional v0">
 </p>
 
 ---
@@ -29,18 +29,14 @@
 
 ### 要点
 
+* ✅ **実装済み v0 —— モデルレジストリ：** `registry.py` はコンパイル済みモデルの JSON レジストリを解析・スキーマ検証し、重複した名前+バージョンのエントリを検出し、名前/タスクに対する最新バージョンを検索し、ローカルの `.hef` ファイルをレジストリと照合して sha256 チェックサムを検証します。下記の `registry validate`/`registry latest` から利用可能で、実行にもテストにも Hailo SDK やハードウェアは不要です。
 * 🛠️ **産業用検知（計画中）：** PCB 部品、はんだ接合部、機械的欠陥を対象としたモデル。
 * 📐 **フィデューシャルアライメント（計画中）：** ピック＆プレース同期のための高精度アンカー。
-* ⚡ **量子化パフォーマンス（計画中）：** Hailo-8/Hailo-10 NPU を対象としたサブ 10ms 推論のための INT8/INT4 バリアント。
-* 🤖 **姿勢推定（計画中）：** ロボットアームの関節追跡のためのキーポイント検出。
+* ⚡ **量子化パフォーマンス（計画中）：** Hailo-8/Hailo-10 NPU を対象としたサブ 10ms 推論のための INT8/INT4 バリアント。*（将来の作業——この環境にはまだない実際の Hailo-8/Hailo-10 NPU と Dataflow Compiler が必要です。）*
+* 🤖 **姿勢推定（計画中）：** ロボットアームの関節追跡のためのキーポイント検出。*（同じ理由で将来の作業です。）*
 * 🧩 **独立したプロジェクトとして存在する理由：** モデルのコンパイルとバージョン管理はデータ/ML ワークフローであり、それらを提供するランタイムプロセスとは完全に異なります——ツールチェーンをここに保つことで、不良なコンパイルが実行中の知覚ノードを危険にさらすことは決してなく、モデルは [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE) に到達する前にオフラインで反復・検証できます。
 
-**正直な現状確認 —— 今日実際に動くもの：** 本リポジトリは現在スケルトン
-段階にあります。実際のエントリポイント（`src/hydra_umc_detection_hef/main.py`）
-は、プロジェクト名、インストール済みバージョン、そして役割を説明する 1 行を
-表示し、終了コード 0 で終了します。上記で説明した ONNX エクスポート、
-Hailo Dataflow Compiler による量子化、HAR/HEF パッケージング、モデル
-レジストリ/バージョン管理ロジックはいずれもまだコードとして存在していません。
+**正直な現状確認 —— 今日実際に動くもの：** 本プロジェクトの仕事のうち、実際にハードウェアに依存しない半分——モデルレジストリ（`registry.py`、`registry validate`/`registry latest`）——は実装され、テストされています（21 個のテスト）。このレジストリが記述するモデルを実際に*生成*する ONNX エクスポート、Hailo Dataflow Compiler による量子化、HAR/HEF パッケージングは、依然として将来の作業です：いずれもこの環境にはない実際の Hailo ハードウェアを必要とします。
 実際に出荷済みの内容は [`CHANGELOG.md`](CHANGELOG.md) を、まだ残っている
 作業は下記の「現在の状況と次のステップ」セクションを参照してください。
 
@@ -48,8 +44,7 @@ Hailo Dataflow Compiler による量子化、HAR/HEF パッケージング、モ
 
 ## 2. 🔄 目標モデルコンパイルフロー
 
-下図は、本スケルトンが構築を目指している目標ツールチェーンであり、今日
-実行されているパイプラインではありません。
+下図は、本プロジェクトが構築を目指している目標*コンパイル*ツールチェーンです——各ステップが実際の Hailo ハードウェアを必要とするため、依然として未実装です。モデル*レジストリ*（このパイプラインが将来生成する `.hef` のバージョン管理と整合性検証）は今日すでに実際に動作します。上記の「要点」と下記の設計上の決定を参照してください。
 
 ```mermaid
 flowchart LR
@@ -81,10 +76,11 @@ flowchart LR
 ONNX にエクスポートされ、Hailo Dataflow Compiler を通じて INT8/INT4
 量子化が行われ（`.har` を生成）、最終的に [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE) が消費する `.hef` バイナリとしてパッケージ化されます。ツールチェーンのコードを書く前に、今のうちにこの形を決定し文書化しておくことで、最終的な実装が後でモデルレジストリ/バージョン管理の方法を即興で考案する必要がなくなります。
 
-### 本スケルトンで既に行われた設計上の決定
+### 既に行われた設計上の決定
 
 * **バージョンはハードコードではなく、インストール済みパッケージのメタデータから読み取られます** —— `main.py` は 2 つ目の `__version__` 文字列の代わりに `importlib.metadata.version("hydra-umc-detection-hef")` を呼び出すため、`bump_version.py` が編集すべき箇所は常に 1 か所です。
 * **オドメーター式のインクリメントは自動的に `PATCH`/`MINOR` にのみ触れます** —— `bump_version.py` は `PATCH` が 9 を超えると `MINOR` に、`MINOR` が 9 を超えると `MAJOR` に繰り上がりますが、`MAJOR` 自体を自動で増加させることは決してありません。`HYDRA-UMC-EDITOR-URDF/bump_version.py` および `HYDRA-UMC-SUITE/bump_version.py` と同じ慣例です。
+* **ローカルの `.hef` ファイルが存在しないことはチェックサムの失敗にはなりません** —— レジストリが記述するファイルが `--models-dir` の下に存在しない場合、`verify_checksum()` はエラーではなく `None`（`False` ではない）を返し、`registry validate` はこれを "skipped" として報告します。レジストリは、このリポジトリに必ずしもチェックインされていない別のオブジェクトストアに存在しうるモデルを記述することを想定しています——実際に存在するファイルのチェックサムが本当に一致しない場合のみ、レジストリが壊れていることを示します。
 
 ---
 
@@ -93,13 +89,17 @@ ONNX にエクスポートされ、Hailo Dataflow Compiler を通じて INT8/INT
 ```text
 HYDRA-UMC-DETECTION-HEF/
 ├── src/                 # ソースコード（hydra_umc_detection_hef パッケージ）
+│   └── hydra_umc_detection_hef/
+│       ├── registry.py  # モデルレジストリ：スキーマ検証、バージョン管理、sha256 チェックサム
+│       └── main.py      # CLI エントリポイント（素の呼び出し + `registry`）
+├── tests/               # 実際の pytest スイート（registry、CLI）
 ├── docs/                # ドキュメントと検証レポート
 ├── build/               # ビルド出力（ローカルの .venv + 将来の HEF ツールチェーン出力）
 ├── images/              # メディアと図表
 ├── scripts/             # ユーティリティスクリプト
 ├── pyproject.toml       # パッケージメタデータ、依存関係、オドメーターバージョン
 ├── bump_version.py      # オドメーター式バージョンインクリメント（build.sh/.bat が実行）
-├── build.sh / build.bat # venv + editable インストール + コンパイルチェック
+├── build.sh / build.bat # venv + editable インストール + コンパイルチェック + テスト
 ├── run.sh / run.bat     # ローカル venv からエントリポイントを実行
 └── CHANGELOG.md         # バージョンごとの履歴（オドメーター方式、日付なし）
 ```
@@ -127,11 +127,12 @@ HYDRA-UMC-DETECTION-HEF/
 
 1. **オドメーター式バージョンインクリメント** — `bump_version.py` を実行し、ビルドのたびに `pyproject.toml` 内の `PATCH` を増加させます（上記の規則に従って `MINOR`/`MAJOR` に繰り上がります）。
 2. **仮想環境** — `.venv/` が存在しない場合は作成し、存在する場合は再利用します。
-3. **Editable インストール** — `pip install -e .` により `src/` 下の変更が即座に反映され、`hydra-umc-detection-hef` コンソールエントリポイントが登録されます。
+3. **Editable インストール** — `pip install -e ".[dev]"` により `src/` 下の変更が即座に反映され、`pytest` がインストールされ、`hydra-umc-detection-hef` コンソールエントリポイントが登録されます。
 4. **コンパイルチェック** — `python -m compileall -q src` が `src/` 下の各ファイルをバイトコンパイルし、エコシステム全体にわたる構文エラーを検出します。
+5. **実際のテストスイート** — `python -m pytest tests/ -q`（レジストリと CLI をカバーする 21 個のテスト）。
 
 `set -euo pipefail` は最初に失敗したステップでスクリプトを停止させます。
-4 つのステップすべてが成功した場合にのみ `== Build OK ==` を表示します。
+5 つのステップすべてが成功した場合にのみビルドは成功を報告します。
 
 ```bash
 ./run.sh
@@ -139,7 +140,24 @@ HYDRA-UMC-DETECTION-HEF/
 
 `.venv` 内のインタープリタを特定し（POSIX と Windows 両方の `.venv`
 ディレクトリ構造を処理）、`python -m hydra_umc_detection_hef.main` を
-実行して名前・バージョン・役割を表示します。
+実行してすべての引数を転送します——素の呼び出しは名前・バージョン・役割
+を表示します。
+
+実際の例 —— レジストリを検証し、モデルの最新バージョンを検索する：
+
+```bash
+./run.sh registry validate --registry registry.json --models-dir models/
+# 2 entries in registry.json
+#   pcb-defect 0.1.0: pcb-defect-0.1.0.hef not present locally, skipped
+#   pcb-defect 0.2.0: checksum OK
+# registry OK
+
+./run.sh registry latest --registry registry.json --name pcb-defect
+# pcb-defect 0.2.0  task=detection  input_shape=(640, 640, 3)
+# classes: solder_bridge, missing_component
+# hef_path: pcb-defect-0.2.0.hef
+# sha256: 1c8a52bb4a34927d55efc913b23f06bd08ff5eeee0aca2ccd8d2c0fd34c81497
+```
 
 ```bat
 :: Windows - 手順は同じ、バッチ構文
@@ -158,16 +176,16 @@ run.bat
 
 ## 🚀 現在の状況と次のステップ
 
-**今日実現していること：** 検証済みのエントリポイントを持つ実際のインストール
-可能な Python パッケージ（実際に取得されたビルド/実行出力については
-[`CHANGELOG.md`](CHANGELOG.md) を参照）、そしてビルドに組み込まれた
-オドメーター式バージョンインクリメント。
+**今日実現していること：** モデルレジストリ——スキーマ検証、重複バージョンの検出、最新バージョンの検索、sha256 による整合性検証（`registry.py`、21 個のテスト）——に加え、検証済みのエントリポイントを持つ実際のインストール
+可能な Python パッケージ、そしてビルドに組み込まれた
+オドメーター式バージョンインクリメント。実際に取得されたビルド/実行出力については
+[`CHANGELOG.md`](CHANGELOG.md) を参照してください。
 
-**まだ残っている作業（順不同、確定した期限なし）：**
+**まだ残っている作業（順不同、確定した期限なし、実際の Hailo ハードウェアに阻まれている）：**
 
 * 訓練済みの PyTorch/YOLO モデルからの実際の ONNX エクスポートステップ。
 * INT8/INT4 量子化のための Hailo Dataflow Compiler 統合。
-* HAR/HEF パッケージングとバージョン管理されたモデルレジストリ。
+* HAR/HEF パッケージング——これが実現すれば、本プロジェクトの `registry.py` が既に読み取り・検証できるレジストリファイルを実際に埋めることになります。
 * コンパイルされた `.hef` 出力を [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE) の `models/` フォルダへ公開すること。
 
 ---

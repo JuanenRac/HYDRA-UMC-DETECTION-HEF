@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Licencia-GPL%203.0-blue.svg" alt="GPL 3.0">
   <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="HEF">
   <img src="https://img.shields.io/badge/Models-YOLOv8%20%2F%20YOLOv10-00A4EF.svg" alt="YOLO">
-  <img src="https://img.shields.io/badge/Stage-Skeleton-lightgrey.svg" alt="Skeleton stage">
+  <img src="https://img.shields.io/badge/Stage-Functional%20v0-green.svg" alt="Functional v0">
 </p>
 
 ---
@@ -25,19 +25,20 @@ This is one of the 4 children of **[HYDRA-UMC-VISION-NODE](https://github.com/Ju
 
 ### Key Points
 
+* ✅ **Real v0 - model registry:** `registry.py` parses and schema-validates a JSON registry of compiled models, detects duplicate name+version entries, finds the latest version for a name/task, and sha256-checksums local `.hef` files against it. Exposed via `registry validate`/`registry latest` below - no Hailo SDK or hardware needed to run or test it.
 * 🛠️ **Industrial Detection (planned):** models targeting PCB components, solder joints, and mechanical defects.
 * 📐 **Fiducial Alignment (planned):** high-precision anchors for Pick-and-Place synchronization.
-* ⚡ **Quantized Performance (planned):** INT8/INT4 variants targeting the Hailo-8/Hailo-10 NPUs for sub-10ms inference.
-* 🤖 **Pose Estimation (planned):** keypoint detection for robotic arm joint tracking.
+* ⚡ **Quantized Performance (planned):** INT8/INT4 variants targeting the Hailo-8/Hailo-10 NPUs for sub-10ms inference. *(future work - needs the real Hailo-8/Hailo-10 NPU and Dataflow Compiler this environment doesn't have.)*
+* 🤖 **Pose Estimation (planned):** keypoint detection for robotic arm joint tracking. *(future work, same reason.)*
 * 🧩 **Why it exists as its own project:** compiling and versioning models is a data/ML workflow, entirely different from the runtime process that serves them - keeping the toolchain here means a bad compile never risks the running perception node, and models can be iterated on and validated offline before ever reaching [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE).
 
-**Honesty check - what actually runs today:** this repository is at the skeleton stage. The real entry point (`src/hydra_umc_detection_hef/main.py`) prints the project name, its installed version, and a one-line role description, then exits with code 0. None of the ONNX export, Hailo Dataflow Compiler quantization, HAR/HEF packaging, or model registry/versioning logic described above exists in code yet. See [`CHANGELOG.md`](CHANGELOG.md) for exactly what has shipped so far, and "Current Status & Next Steps" below for what remains open.
+**Honesty check - what actually runs today:** the real, hardware-independent half of this project's job - the model registry (`registry.py`, `registry validate`/`registry latest`) - is implemented and tested (21 tests). The ONNX export, Hailo Dataflow Compiler quantization, and HAR/HEF packaging steps that would actually *produce* the models this registry describes are still future work: they need real Hailo hardware this environment doesn't have. See [`CHANGELOG.md`](CHANGELOG.md) for exactly what has shipped so far, and "Current Status & Next Steps" below for what remains open.
 
 ---
 
 ## 2. 🔄 INTENDED MODEL COMPILATION FLOW
 
-The diagram below is the target toolchain this skeleton is being built towards, not a pipeline that runs today.
+The diagram below is the target *compilation* toolchain this project is being built towards - still not implemented, since every step needs real Hailo hardware. The model *registry* (versioning + integrity checking of whatever `.hef` files this pipeline eventually produces) is real today; see "Key Points" above and the design decisions below.
 
 ```mermaid
 flowchart LR
@@ -60,10 +61,11 @@ This project ships model files and the tooling that compiles them, not a physica
 
 The diagram above already fixes the intended pipeline shape: PyTorch/YOLO training happens elsewhere (out of scope for this repository), models are exported to ONNX, run through the Hailo Dataflow Compiler for INT8/INT4 quantization (producing a `.har`), and finally packaged as a `.hef` binary that [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE) consumes. Deciding and documenting this shape now, before writing the toolchain code, keeps the eventual implementation from having to improvise the model registry/versioning story later.
 
-### Design decisions already made in this skeleton
+### Design decisions already made
 
 * **Version read from installed package metadata, not hardcoded** - `main.py` calls `importlib.metadata.version("hydra-umc-detection-hef")` instead of a second `__version__` string, so `bump_version.py` only ever has one place to edit.
 * **The odometer bump only ever touches `PATCH`/`MINOR` automatically** - `bump_version.py` carries `PATCH` into `MINOR` past 9 and `MINOR` into `MAJOR` past 9, but never bumps `MAJOR` itself; same convention as `HYDRA-UMC-EDITOR-URDF/bump_version.py` and `HYDRA-UMC-SUITE/bump_version.py`.
+* **A missing local `.hef` file is not a checksum failure** - `verify_checksum()` returns `None` (not `False`) when the file the registry describes isn't present under `--models-dir`, and `registry validate` reports it as "skipped", not an error. The registry is expected to describe models that may live in a separate object store, not necessarily checked into this repo - only a checksum that actually mismatches for a file that *is* present indicates a corrupt registry.
 
 ---
 
@@ -72,13 +74,17 @@ The diagram above already fixes the intended pipeline shape: PyTorch/YOLO traini
 ```text
 HYDRA-UMC-DETECTION-HEF/
 ├── src/                 # Source code (hydra_umc_detection_hef package)
+│   └── hydra_umc_detection_hef/
+│       ├── registry.py  # Model registry: schema validation, versioning, sha256 checks
+│       └── main.py      # CLI entry point (bare invocation + `registry`)
+├── tests/               # Real pytest suite (registry, CLI)
 ├── docs/                # Documentation and validation reports
 ├── build/               # Build output (local .venv + future HEF toolchain output)
 ├── images/              # Media and diagrams
 ├── scripts/             # Utility scripts
 ├── pyproject.toml       # Package metadata, dependencies, odometer version
 ├── bump_version.py      # Odometer-style version bump (run by build.sh/.bat)
-├── build.sh / build.bat # venv + editable install + compile-check
+├── build.sh / build.bat # venv + editable install + compile-check + tests
 ├── run.sh / run.bat     # Runs the entry point from the local venv
 └── CHANGELOG.md         # Version-by-version history (odometer scheme, no dates)
 ```
@@ -104,16 +110,33 @@ No `hardware/`, `firmware/`, `os/` or `models/` folder - see "Advanced Technical
 
 1. **Odometer version bump** - runs `bump_version.py`, incrementing `PATCH` in `pyproject.toml` on every build (carrying into `MINOR`/`MAJOR` per the rule above).
 2. **Virtual environment** - creates `.venv/` if missing; reuses it otherwise.
-3. **Editable install** - `pip install -e .` so `src/` edits take effect immediately, and registers the `hydra-umc-detection-hef` console entry point.
+3. **Editable install** - `pip install -e ".[dev]"` so `src/` edits take effect immediately, installs `pytest`, and registers the `hydra-umc-detection-hef` console entry point.
 4. **Compile-check** - `python -m compileall -q src` byte-compiles every file under `src/`, catching syntax errors ecosystem-wide.
+5. **Real test suite** - `python -m pytest tests/ -q` (21 tests covering the registry and the CLI).
 
-`set -euo pipefail` stops the script at the first failing step; `== Build OK ==` prints only if all 4 succeed.
+`set -euo pipefail` stops the script at the first failing step; the build only reports success if all 5 pass.
 
 ```bash
 ./run.sh
 ```
 
-Locates the interpreter inside `.venv` (handling both the POSIX and Windows `.venv` layouts) and runs `python -m hydra_umc_detection_hef.main`, printing name + version + role.
+Locates the interpreter inside `.venv` (handling both the POSIX and Windows `.venv` layouts) and runs `python -m hydra_umc_detection_hef.main`, forwarding any arguments through - bare invocation prints name + version + role.
+
+Real example - validate a registry and look up the latest version of a model:
+
+```bash
+./run.sh registry validate --registry registry.json --models-dir models/
+# 2 entries in registry.json
+#   pcb-defect 0.1.0: pcb-defect-0.1.0.hef not present locally, skipped
+#   pcb-defect 0.2.0: checksum OK
+# registry OK
+
+./run.sh registry latest --registry registry.json --name pcb-defect
+# pcb-defect 0.2.0  task=detection  input_shape=(640, 640, 3)
+# classes: solder_bridge, missing_component
+# hef_path: pcb-defect-0.2.0.hef
+# sha256: 1c8a52bb4a34927d55efc913b23f06bd08ff5eeee0aca2ccd8d2c0fd34c81497
+```
 
 ```bat
 :: Windows - identical steps, batch syntax
@@ -132,13 +155,13 @@ run.bat
 
 ## 🚀 Current Status & Next Steps
 
-**What works today:** a real, installable Python package with a verified entry point (see [`CHANGELOG.md`](CHANGELOG.md) for the captured build/run output) and an odometer-style version bump wired into the build.
+**What works today:** the model registry - schema validation, duplicate-version detection, latest-version lookup, and sha256 integrity checking (`registry.py`, 21 tests) - plus a real, installable Python package with a verified entry point and an odometer-style version bump wired into the build. See [`CHANGELOG.md`](CHANGELOG.md) for the captured build/run output.
 
-**What is still open, in no particular order and with no committed timeline:**
+**What is still open, in no particular order and with no committed timeline, and blocked on real Hailo hardware:**
 
 * The real ONNX export step from trained PyTorch/YOLO models.
 * Hailo Dataflow Compiler integration for INT8/INT4 quantization.
-* HAR/HEF packaging and a versioned model registry.
+* HAR/HEF packaging that would actually populate a registry file this project's `registry.py` already knows how to read and validate.
 * Publishing compiled `.hef` output into [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE)'s `models/` folder.
 
 ---

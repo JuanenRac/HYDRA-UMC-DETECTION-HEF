@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Licence-GPL%203.0-blue.svg" alt="GPL 3.0">
   <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="HEF">
   <img src="https://img.shields.io/badge/Mod%C3%A8les-YOLOv8%20%2F%20YOLOv10-00A4EF.svg" alt="YOLO">
-  <img src="https://img.shields.io/badge/%C3%89tape-Squelette-lightgrey.svg" alt="Étape squelette">
+  <img src="https://img.shields.io/badge/%C3%89tape-Fonctionnel%20v0-green.svg" alt="Fonctionnel v0">
 </p>
 
 ---
@@ -25,19 +25,20 @@ C'est l'un des 4 enfants de **[HYDRA-UMC-VISION-NODE](https://github.com/JuanenR
 
 ### Points Clés
 
+* ✅ **Réel v0 - registre de modèles :** `registry.py` analyse et valide par schéma un registre JSON de modèles compilés, détecte les entrées nom+version en double, trouve la dernière version pour un nom/tâche, et vérifie par sha256 les fichiers `.hef` locaux par rapport au registre. Exposé via `registry validate`/`registry latest` ci-dessous - aucun SDK Hailo ni matériel nécessaire pour l'exécuter ou le tester.
 * 🛠️ **Détection industrielle (prévu) :** modèles ciblant les composants PCB, les soudures et les défauts mécaniques.
 * 📐 **Alignement de fiduciaux (prévu) :** repères de haute précision pour la synchronisation Pick-and-Place.
-* ⚡ **Performance quantifiée (prévu) :** variantes INT8/INT4 ciblant les NPU Hailo-8/Hailo-10 pour une inférence sub-10ms.
-* 🤖 **Estimation de pose (prévu) :** détection de points clés pour le suivi des articulations du bras robotique.
+* ⚡ **Performance quantifiée (prévu) :** variantes INT8/INT4 ciblant les NPU Hailo-8/Hailo-10 pour une inférence sub-10ms. *(travail futur - nécessite la vraie NPU Hailo-8/Hailo-10 et le Dataflow Compiler que cet environnement n'a pas.)*
+* 🤖 **Estimation de pose (prévu) :** détection de points clés pour le suivi des articulations du bras robotique. *(travail futur, même raison.)*
 * 🧩 **Pourquoi c'est un projet séparé :** compiler et versionner des modèles est un flux de travail data/ML, entièrement différent du processus d'exécution qui les sert - garder la chaîne d'outils ici signifie qu'une mauvaise compilation ne met jamais en danger le nœud de perception en cours d'exécution, et les modèles peuvent être itérés et validés hors ligne avant d'atteindre [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE).
 
-**Vérification d'honnêteté - ce qui fonctionne réellement aujourd'hui :** ce dépôt est à l'étape squelette. Le point d'entrée réel (`src/hydra_umc_detection_hef/main.py`) affiche le nom du projet, sa version installée et une description de rôle en une ligne, puis se termine avec le code 0. Rien de l'export ONNX, de la quantification via le Hailo Dataflow Compiler, de l'empaquetage HAR/HEF ou du registre/versionnement de modèles décrit ci-dessus n'existe encore dans le code. Voir [`CHANGELOG.md`](CHANGELOG.md) pour ce qui a été livré exactement jusqu'à présent, et « État Actuel et Prochaines Étapes » ci-dessous pour ce qui reste ouvert.
+**Vérification d'honnêteté - ce qui fonctionne réellement aujourd'hui :** la moitié réelle et indépendante du matériel du travail de ce projet - le registre de modèles (`registry.py`, `registry validate`/`registry latest`) - est implémentée et testée (21 tests). L'export ONNX, la quantification via le Hailo Dataflow Compiler et l'empaquetage HAR/HEF qui produiraient réellement les modèles décrits par ce registre restent un travail futur : ils nécessitent du vrai matériel Hailo que cet environnement n'a pas. Voir [`CHANGELOG.md`](CHANGELOG.md) pour ce qui a été livré exactement jusqu'à présent, et « État Actuel et Prochaines Étapes » ci-dessous pour ce qui reste ouvert.
 
 ---
 
 ## 2. 🔄 FLUX DE COMPILATION DE MODÈLES PRÉVU
 
-Le diagramme ci-dessous est la chaîne d'outils cible vers laquelle ce squelette est construit, pas un pipeline fonctionnel aujourd'hui.
+Le diagramme ci-dessous est la chaîne d'outils de *compilation* cible vers laquelle ce projet est construit - toujours non implémentée, car chaque étape nécessite du vrai matériel Hailo. Le *registre* de modèles (versionnement + vérification d'intégrité des `.hef` que ce pipeline produira un jour) est réel aujourd'hui ; voir « Points Clés » ci-dessus et les décisions de conception ci-dessous.
 
 ```mermaid
 flowchart LR
@@ -60,10 +61,11 @@ Ce projet livre des fichiers de modèles et l'outillage qui les compile, pas un 
 
 Le diagramme ci-dessus fixe déjà la forme prévue du pipeline : l'entraînement PyTorch/YOLO se passe ailleurs (hors périmètre de ce dépôt), les modèles sont exportés vers ONNX, passent par le Hailo Dataflow Compiler pour une quantification INT8/INT4 (produisant un `.har`), et sont enfin empaquetés en un binaire `.hef` consommé par [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE). Décider et documenter cette forme maintenant, avant d'écrire le code de la chaîne d'outils, évite à l'implémentation finale d'avoir à improviser plus tard l'histoire du registre/versionnement des modèles.
 
-### Décisions de conception déjà prises dans ce squelette
+### Décisions de conception déjà prises
 
 * **La version est lue depuis les métadonnées du paquet installé, pas codée en dur** - `main.py` appelle `importlib.metadata.version("hydra-umc-detection-hef")` plutôt qu'une seconde chaîne `__version__`, donc `bump_version.py` n'a qu'un seul endroit à modifier.
 * **L'incrément « compteur kilométrique » ne touche automatiquement que `PATCH`/`MINOR`** - `bump_version.py` reporte `PATCH` vers `MINOR` au-delà de 9 et `MINOR` vers `MAJOR` au-delà de 9, mais n'incrémente jamais `MAJOR` lui-même ; même convention que `HYDRA-UMC-EDITOR-URDF/bump_version.py` et `HYDRA-UMC-SUITE/bump_version.py`.
+* **Un fichier `.hef` local manquant n'est pas un échec de checksum** - `verify_checksum()` renvoie `None` (pas `False`) quand le fichier décrit par le registre n'est pas présent sous `--models-dir`, et `registry validate` le signale comme « skipped », pas comme une erreur. Le registre est censé décrire des modèles pouvant vivre dans un stockage d'objets séparé, pas nécessairement versionné dans ce dépôt - seul un checksum réellement différent pour un fichier bel et bien présent indique un registre corrompu.
 
 ---
 
@@ -72,13 +74,17 @@ Le diagramme ci-dessus fixe déjà la forme prévue du pipeline : l'entraînemen
 ```text
 HYDRA-UMC-DETECTION-HEF/
 ├── src/                 # Code source (paquet hydra_umc_detection_hef)
+│   └── hydra_umc_detection_hef/
+│       ├── registry.py  # Registre de modèles : validation par schéma, versionnement, checksums sha256
+│       └── main.py      # Point d'entrée CLI (invocation nue + `registry`)
+├── tests/               # Suite pytest réelle (registry, CLI)
 ├── docs/                # Documentation et rapports de validation
 ├── build/               # Sortie de build (.venv local + future sortie de la chaîne HEF)
 ├── images/              # Médias et diagrammes
 ├── scripts/             # Scripts utilitaires
 ├── pyproject.toml       # Métadonnées du paquet, dépendances, version compteur kilométrique
 ├── bump_version.py      # Incrément de version type compteur kilométrique (build.sh/.bat)
-├── build.sh / build.bat # venv + installation éditable + compile-check
+├── build.sh / build.bat # venv + installation éditable + compile-check + tests
 ├── run.sh / run.bat     # Exécute le point d'entrée depuis le venv local
 └── CHANGELOG.md         # Historique version par version (schéma compteur kilométrique, sans dates)
 ```
@@ -104,16 +110,33 @@ Aucun dossier `hardware/`, `firmware/`, `os/` ni `models/` - voir « Information
 
 1. **Incrément de version compteur kilométrique** - exécute `bump_version.py`, incrémentant `PATCH` dans `pyproject.toml` à chaque build.
 2. **Environnement virtuel** - crée `.venv/` s'il manque ; le réutilise sinon.
-3. **Installation éditable** - `pip install -e .` pour que les modifications sous `src/` prennent effet immédiatement, et enregistre le point d'entrée console `hydra-umc-detection-hef`.
+3. **Installation éditable** - `pip install -e ".[dev]"` pour que les modifications sous `src/` prennent effet immédiatement, installe `pytest`, et enregistre le point d'entrée console `hydra-umc-detection-hef`.
 4. **Compile-check** - `python -m compileall -q src` compile en bytecode chaque fichier sous `src/`.
+5. **Suite de tests réelle** - `python -m pytest tests/ -q` (21 tests couvrant le registre et le CLI).
 
-`set -euo pipefail` arrête le script à la première étape en échec ; `== Build OK ==` ne s'affiche que si les 4 étapes réussissent.
+`set -euo pipefail` arrête le script à la première étape en échec ; le build ne signale un succès que si les 5 étapes réussissent.
 
 ```bash
 ./run.sh
 ```
 
-Localise l'interpréteur dans `.venv` et exécute `python -m hydra_umc_detection_hef.main`, affichant nom + version + rôle.
+Localise l'interpréteur dans `.venv` et exécute `python -m hydra_umc_detection_hef.main`, en relayant tout argument - l'invocation nue affiche nom + version + rôle.
+
+Exemple réel - valider un registre et rechercher la dernière version d'un modèle :
+
+```bash
+./run.sh registry validate --registry registry.json --models-dir models/
+# 2 entries in registry.json
+#   pcb-defect 0.1.0: pcb-defect-0.1.0.hef not present locally, skipped
+#   pcb-defect 0.2.0: checksum OK
+# registry OK
+
+./run.sh registry latest --registry registry.json --name pcb-defect
+# pcb-defect 0.2.0  task=detection  input_shape=(640, 640, 3)
+# classes: solder_bridge, missing_component
+# hef_path: pcb-defect-0.2.0.hef
+# sha256: 1c8a52bb4a34927d55efc913b23f06bd08ff5eeee0aca2ccd8d2c0fd34c81497
+```
 
 ```bat
 :: Windows - mêmes étapes, syntaxe batch
@@ -132,13 +155,13 @@ run.bat
 
 ## 🚀 État Actuel et Prochaines Étapes
 
-**Ce qui fonctionne aujourd'hui :** un vrai paquet Python installable avec un point d'entrée vérifié (voir [`CHANGELOG.md`](CHANGELOG.md) pour la sortie de build/run capturée) et un incrément de version compteur kilométrique intégré au build.
+**Ce qui fonctionne aujourd'hui :** le registre de modèles - validation par schéma, détection de versions en double, recherche de la dernière version, et vérification d'intégrité par sha256 (`registry.py`, 21 tests) - plus un vrai paquet Python installable avec un point d'entrée vérifié et un incrément de version compteur kilométrique intégré au build. Voir [`CHANGELOG.md`](CHANGELOG.md) pour la sortie de build/run capturée.
 
-**Ce qui reste ouvert, sans ordre particulier et sans calendrier engagé :**
+**Ce qui reste ouvert, sans ordre particulier, sans calendrier engagé, et bloqué par du vrai matériel Hailo :**
 
 * L'export ONNX réel depuis des modèles PyTorch/YOLO entraînés.
 * L'intégration du Hailo Dataflow Compiler pour la quantification INT8/INT4.
-* L'empaquetage HAR/HEF et un registre de modèles versionné.
+* L'empaquetage HAR/HEF qui peuplerait réellement un fichier de registre que le `registry.py` de ce projet sait déjà lire et valider.
 * La publication de la sortie `.hef` compilée dans le dossier `models/` de [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE).
 
 ---
