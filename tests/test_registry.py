@@ -17,11 +17,11 @@ def _write_registry(path, entries):
     path.write_text(json.dumps(entries), encoding="utf-8")
 
 
-def _entry(name="pcb-defect", version="0.1.0", task="detection", sha256="a" * 64):
+def _entry(name="pcb-defect", version="0.1.0", task="detection", sha256="a" * 64, hailo_arch="hailo8"):
     return {
         "name": name, "version": version, "task": task,
         "input_shape": [640, 640, 3], "classes": ["solder_bridge", "missing_component"],
-        "hef_path": f"{name}-{version}.hef", "sha256": sha256,
+        "hef_path": f"{name}-{version}.hef", "sha256": sha256, "hailo_arch": hailo_arch,
     }
 
 
@@ -55,6 +55,23 @@ def test_load_registry_bad_sha256(tmp_path):
     _write_registry(reg_path, [_entry(sha256="not-hex")])
     with pytest.raises(RegistryError):
         load_registry(reg_path)
+
+
+def test_load_registry_unknown_hailo_arch(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    _write_registry(reg_path, [_entry(hailo_arch="hailo9-doesnt-exist")])
+    with pytest.raises(RegistryError):
+        load_registry(reg_path)
+
+
+def test_load_registry_accepts_every_known_hailo_arch(tmp_path):
+    from hydra_umc_detection_hef.registry import KNOWN_HAILO_ARCHS
+
+    for arch in sorted(KNOWN_HAILO_ARCHS):
+        reg_path = tmp_path / f"registry-{arch}.json"
+        _write_registry(reg_path, [_entry(hailo_arch=arch)])
+        entries = load_registry(reg_path)
+        assert entries[0].hailo_arch == arch
 
 
 def test_load_registry_not_a_list(tmp_path):

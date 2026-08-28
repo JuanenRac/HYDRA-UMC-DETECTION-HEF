@@ -11,11 +11,11 @@ def run_cli(*args):
     )
 
 
-def _entry(sha256="a" * 64):
+def _entry(sha256="a" * 64, hailo_arch="hailo8"):
     return {
         "name": "pcb-defect", "version": "0.1.0", "task": "detection",
         "input_shape": [640, 640, 3], "classes": ["solder_bridge"],
-        "hef_path": "pcb-defect-0.1.0.hef", "sha256": sha256,
+        "hef_path": "pcb-defect-0.1.0.hef", "sha256": sha256, "hailo_arch": hailo_arch,
     }
 
 
@@ -86,3 +86,54 @@ def test_registry_latest_no_match(tmp_path):
 
     result = run_cli("registry", "latest", "--registry", str(reg_path), "--name", "nonexistent")
     assert result.returncode == 1
+
+
+def test_registry_load_ready(tmp_path):
+    content = b"a real fake hef payload"
+    digest = hashlib.sha256(content).hexdigest()
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    (models_dir / "pcb-defect-0.1.0.hef").write_bytes(content)
+
+    reg_path = tmp_path / "registry.json"
+    reg_path.write_text(json.dumps([_entry(sha256=digest, hailo_arch="hailo8")]), encoding="utf-8")
+
+    result = run_cli(
+        "registry", "load", "--registry", str(reg_path), "--models-dir", str(models_dir),
+        "--name", "pcb-defect", "--target-arch", "hailo8",
+    )
+    assert result.returncode == 0
+    assert "READY" in result.stdout
+
+
+def test_registry_load_rejects_arch_mismatch(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    reg_path.write_text(json.dumps([_entry(hailo_arch="hailo8")]), encoding="utf-8")
+
+    result = run_cli(
+        "registry", "load", "--registry", str(reg_path), "--models-dir", str(tmp_path / "models"),
+        "--name", "pcb-defect", "--target-arch", "hailo15h",
+    )
+    assert result.returncode == 1
+    assert "REJECTED_ARCH_MISMATCH" in result.stderr
+
+
+def test_registry_load_rejects_a_real_tampered_file(tmp_path):
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    real_content = b"original bytes"
+    (models_dir / "pcb-defect-0.1.0.hef").write_bytes(real_content)
+    digest = hashlib.sha256(real_content).hexdigest()
+
+    reg_path = tmp_path / "registry.json"
+    reg_path.write_text(json.dumps([_entry(sha256=digest, hailo_arch="hailo8")]), encoding="utf-8")
+
+    # Real file tampering after the registry recorded the real checksum.
+    (models_dir / "pcb-defect-0.1.0.hef").write_bytes(b"tampered bytes")
+
+    result = run_cli(
+        "registry", "load", "--registry", str(reg_path), "--models-dir", str(models_dir),
+        "--name", "pcb-defect", "--target-arch", "hailo8",
+    )
+    assert result.returncode == 1
+    assert "REJECTED_CHECKSUM_MISMATCH" in result.stderr

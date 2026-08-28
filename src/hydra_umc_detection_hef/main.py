@@ -8,8 +8,11 @@
 Real v0: the model registry/versioning half of the toolchain
 (registry.py) - parsing, validating, and checksumming a JSON registry of
 compiled .hef models, independent of the Hailo SDK and hardware needed
-to actually produce one. ONNX export and Hailo Dataflow Compiler
-quantization still need that real hardware and land later.
+to actually produce one - plus a real, combined safe-load gate
+(compatibility.py) that checks Hailo-architecture compatibility and
+checksum integrity together before ever reporting a model ready to
+deploy. ONNX export and Hailo Dataflow Compiler quantization still need
+real hardware and land later.
 """
 from __future__ import annotations
 
@@ -18,6 +21,7 @@ import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+from .compatibility import safe_load
 from .registry import RegistryError, duplicate_versions, find_latest, load_registry, verify_checksum
 
 PROJECT_NAME = "HYDRA-UMC-DETECTION-HEF"
@@ -95,6 +99,27 @@ def _cmd_registry_latest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_registry_load(args: argparse.Namespace) -> int:
+    try:
+        entries = load_registry(Path(args.registry))
+    except RegistryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    entry = find_latest(entries, args.name, args.task)
+    if entry is None:
+        print(f"no model named {args.name!r}" + (f" with task {args.task!r}" if args.task else ""), file=sys.stderr)
+        return 1
+
+    result = safe_load(entry, Path(args.models_dir), args.target_arch)
+    if result.is_ready:
+        print(f"READY: {result.detail}")
+        return 0
+
+    print(f"{result.outcome.name}: {result.detail}", file=sys.stderr)
+    return 1
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hydra-umc-detection-hef")
     subparsers = parser.add_subparsers(dest="command")
@@ -112,6 +137,18 @@ def _build_parser() -> argparse.ArgumentParser:
     latest.add_argument("--name", required=True, help="Model name to look up")
     latest.add_argument("--task", default=None, help="Restrict to this task (e.g. detection, pose)")
     latest.set_defaults(func=_cmd_registry_latest)
+
+    load = registry_sub.add_parser(
+        "load", help="Real safe-load gate: architecture compatibility + checksum, combined."
+    )
+    load.add_argument("--registry", required=True, help="Path to the registry JSON file")
+    load.add_argument("--models-dir", required=True, help="Directory containing the .hef files")
+    load.add_argument("--name", required=True, help="Model name to look up")
+    load.add_argument("--task", default=None, help="Restrict to this task (e.g. detection, pose)")
+    load.add_argument(
+        "--target-arch", required=True, help="Hailo architecture of this deployment (e.g. hailo8)"
+    )
+    load.set_defaults(func=_cmd_registry_load)
 
     return parser
 

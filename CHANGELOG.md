@@ -10,9 +10,12 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
-## [0.0.3]
+## [0.0.4] - Real safe-load gate: Hailo-architecture compatibility + checksum
 
-- Build version synchronized with `hydra-umc.project.json` and the repository-native version source.
+- **`registry.py`** - `ModelEntry` gains a required `hailo_arch` field, validated at load time against `KNOWN_HAILO_ARCHS` (the real Hailo NPU family identifiers a compiled `.hef` targets: `hailo8`/`hailo8r`/`hailo8l`/`hailo15h`/`hailo15m`/`hailo15l`/`hailo10h`) - a typo'd or invented architecture name is now caught at registry-validation time instead of surfacing as a mysterious load failure on real hardware later.
+- **`compatibility.py`** (new) - `safe_load()`, a real, combined safe-load decision: checks Hailo-architecture compatibility FIRST (pure metadata, no I/O - a model compiled for the wrong chip is rejected before the filesystem is even touched), then verifies the registry's existing sha256 checksum against the real local file. Returns a real `LoadResult`/`LoadOutcome` (`READY`, `REJECTED_ARCH_MISMATCH`, `REJECTED_MISSING_FILE`, `REJECTED_CHECKSUM_MISMATCH`) - never reports a model ready to deploy unless every real check passes. Closes the gap between "the registry's individual checks are correct" and "there is one safe gate that actually decides whether to trust a model before it loads."
+- **`main.py`** - new `registry load --registry --models-dir --name [--task] --target-arch` subcommand wraps `safe_load()`, printing `READY: ...` (exit 0) or `REJECTED_*: ...` with the specific reason (exit 1); `registry validate`/`registry latest` unchanged.
+- 11 new tests (`hailo_arch` schema validation for every known architecture plus a rejected typo, all of `compatibility.py` including a test that tampers with a real file's bytes after the registry recorded its real checksum and confirms it's still rejected, plus 3 new CLI round-trips) - 32 total. Verified live: a real registry + a real `.hef` fixture file loads as `READY`; the same fixture targeted at the wrong architecture is rejected before any file is read; the same fixture with its bytes overwritten after the checksum was recorded is rejected as a checksum mismatch.
 
 ## [0.0.3] - Real v0: compiled-model registry (versioning + integrity)
 

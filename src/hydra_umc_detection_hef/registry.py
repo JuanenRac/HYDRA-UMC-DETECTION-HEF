@@ -23,6 +23,14 @@ from pathlib import Path
 
 _VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 
+# Real Hailo NPU family identifiers a compiled .hef targets - the Hailo
+# Dataflow Compiler bakes the target architecture into the .hef itself,
+# and loading one on the wrong chip is a real, well-documented failure
+# mode (not a hypothetical one this registry invents a check for).
+KNOWN_HAILO_ARCHS = frozenset(
+    {"hailo8", "hailo8r", "hailo8l", "hailo15h", "hailo15m", "hailo15l", "hailo10h"}
+)
+
 
 class RegistryError(ValueError):
     """Raised for a malformed registry file or entry."""
@@ -37,6 +45,7 @@ class ModelEntry:
     classes: tuple[str, ...]
     hef_path: str
     sha256: str
+    hailo_arch: str
 
     @property
     def version_tuple(self) -> tuple[int, int, int]:
@@ -47,7 +56,7 @@ class ModelEntry:
 
 
 def _parse_entry(raw: dict, index: int) -> ModelEntry:
-    required = ("name", "version", "task", "input_shape", "classes", "hef_path", "sha256")
+    required = ("name", "version", "task", "input_shape", "classes", "hef_path", "sha256", "hailo_arch")
     missing = [field for field in required if field not in raw]
     if missing:
         raise RegistryError(f"entry {index}: missing field(s) {missing}")
@@ -71,11 +80,18 @@ def _parse_entry(raw: dict, index: int) -> ModelEntry:
         raise RegistryError(f"entry {index}: hef_path must not be empty")
     if not re.fullmatch(r"[0-9a-fA-F]{64}", raw["sha256"]):
         raise RegistryError(f"entry {index}: sha256 must be a 64-char hex digest")
+    if raw["hailo_arch"] not in KNOWN_HAILO_ARCHS:
+        raise RegistryError(
+            f"entry {index}: hailo_arch {raw['hailo_arch']!r} is not a known Hailo architecture "
+            f"({sorted(KNOWN_HAILO_ARCHS)}) - catches a typo'd or invented arch name at "
+            "registry-validation time rather than at deploy time on the wrong chip"
+        )
 
     return ModelEntry(
         name=raw["name"], version=raw["version"], task=raw["task"],
         input_shape=input_shape, classes=classes,
         hef_path=raw["hef_path"], sha256=raw["sha256"].lower(),
+        hailo_arch=raw["hailo_arch"],
     )
 
 

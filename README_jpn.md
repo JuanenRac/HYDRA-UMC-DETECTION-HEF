@@ -30,6 +30,7 @@
 ### 要点
 
 * ✅ **実装済み v0 —— モデルレジストリ：** `registry.py` はコンパイル済みモデルの JSON レジストリを解析・スキーマ検証し、重複した名前+バージョンのエントリを検出し、名前/タスクに対する最新バージョンを検索し、ローカルの `.hef` ファイルをレジストリと照合して sha256 チェックサムを検証します。下記の `registry validate`/`registry latest` から利用可能で、実行にもテストにも Hailo SDK やハードウェアは不要です。
+* 🔒 **実装済み v0 —— 安全なロードのゲート：** `compatibility.py` の `safe_load()` は、チェックサムを検証する前に実際の Hailo アーキテクチャ互換性(`hailo8`/`hailo15h` など——各レジストリエントリは今やターゲットチップを宣言します)を検証し、両方の実際のチェックが通った場合にのみモデルをデプロイ準備完了として報告します。下記の `registry load` から利用可能です。
 * 🛠️ **産業用検知（計画中）：** PCB 部品、はんだ接合部、機械的欠陥を対象としたモデル。
 * 📐 **フィデューシャルアライメント（計画中）：** ピック＆プレース同期のための高精度アンカー。
 * ⚡ **量子化パフォーマンス（計画中）：** Hailo-8/Hailo-10 NPU を対象としたサブ 10ms 推論のための INT8/INT4 バリアント。*（将来の作業——この環境にはまだない実際の Hailo-8/Hailo-10 NPU と Dataflow Compiler が必要です。）*
@@ -81,6 +82,8 @@ ONNX にエクスポートされ、Hailo Dataflow Compiler を通じて INT8/INT
 * **バージョンはハードコードではなく、インストール済みパッケージのメタデータから読み取られます** —— `main.py` は 2 つ目の `__version__` 文字列の代わりに `importlib.metadata.version("hydra-umc-detection-hef")` を呼び出すため、`bump_version.py` が編集すべき箇所は常に 1 か所です。
 * **オドメーター式のインクリメントは自動的に `PATCH`/`MINOR` にのみ触れます** —— `bump_version.py` は `PATCH` が 9 を超えると `MINOR` に、`MINOR` が 9 を超えると `MAJOR` に繰り上がりますが、`MAJOR` 自体を自動で増加させることは決してありません。`HYDRA-UMC-EDITOR-URDF/bump_version.py` および `HYDRA-UMC-SUITE/bump_version.py` と同じ慣例です。
 * **ローカルの `.hef` ファイルが存在しないことはチェックサムの失敗にはなりません** —— レジストリが記述するファイルが `--models-dir` の下に存在しない場合、`verify_checksum()` はエラーではなく `None`（`False` ではない）を返し、`registry validate` はこれを "skipped" として報告します。レジストリは、このリポジトリに必ずしもチェックインされていない別のオブジェクトストアに存在しうるモデルを記述することを想定しています——実際に存在するファイルのチェックサムが本当に一致しない場合のみ、レジストリが壊れていることを示します。
+* **`safe_load()` がチェックサムより先にアーキテクチャをチェックする理由(その逆ではない)。** アーキテクチャ互換性は純粋なメタデータです(I/O なし)——チェックサム検証は実際のファイルを読む必要があります。まず安価で根本的なゲートをチェックすることで、間違った Hailo チップ向けにコンパイルされたモデルは、ファイルシステムに触れる前に拒否されます。そして拒否理由は、どのみちこのハードウェアでは決して動かなかったモデルに対する紛らわしい「ファイルが見つかりません」ではなく、実際に失敗した根本的なチェックを示します。
+* **アーキテクチャ互換性が互換性マトリクスではなく完全一致である理由。** Hailo Dataflow Compiler はコンパイル時にターゲットチップを `.hef` に焼き込みます——例えば Hailo-15H が Hailo-8 の `.hef` を実行できると主張するには、この環境にはない実際のハードウェア上での実際のクロスアーキテクチャ検証が必要になります。完全一致は、レジストリのメタデータだけから正直に検証できる唯一の互換性の主張です。
 
 ---
 
@@ -90,8 +93,9 @@ ONNX にエクスポートされ、Hailo Dataflow Compiler を通じて INT8/INT
 HYDRA-UMC-DETECTION-HEF/
 ├── src/                 # ソースコード（hydra_umc_detection_hef パッケージ）
 │   └── hydra_umc_detection_hef/
-│       ├── registry.py  # モデルレジストリ：スキーマ検証、バージョン管理、sha256 チェックサム
-│       └── main.py      # CLI エントリポイント（素の呼び出し + `registry`）
+│       ├── registry.py       # モデルレジストリ：スキーマ検証、バージョン管理、sha256 チェックサム
+│       ├── compatibility.py  # 実際の安全なロードのゲート：アーキテクチャ互換性 + チェックサム
+│       └── main.py           # CLI エントリポイント（素の呼び出し + `registry`）
 ├── tests/               # 実際の pytest スイート（registry、CLI）
 ├── docs/                # ドキュメントと検証レポート
 ├── build/               # ビルド出力（ローカルの .venv + 将来の HEF ツールチェーン出力）
@@ -129,7 +133,7 @@ HYDRA-UMC-DETECTION-HEF/
 2. **仮想環境** — `.venv/` が存在しない場合は作成し、存在する場合は再利用します。
 3. **Editable インストール** — `pip install -e ".[dev]"` により `src/` 下の変更が即座に反映され、`pytest` がインストールされ、`hydra-umc-detection-hef` コンソールエントリポイントが登録されます。
 4. **コンパイルチェック** — `python -m compileall -q src` が `src/` 下の各ファイルをバイトコンパイルし、エコシステム全体にわたる構文エラーを検出します。
-5. **実際のテストスイート** — `python -m pytest tests/ -q`（レジストリと CLI をカバーする 21 個のテスト）。
+5. **実際のテストスイート** — `python -m pytest tests/ -q`（レジストリ、安全なロードのゲート、CLI をカバーする 32 個のテスト）。
 
 `set -euo pipefail` は最初に失敗したステップでスクリプトを停止させます。
 5 つのステップすべてが成功した場合にのみビルドは成功を報告します。
@@ -159,6 +163,19 @@ HYDRA-UMC-DETECTION-HEF/
 # sha256: 1c8a52bb4a34927d55efc913b23f06bd08ff5eeee0aca2ccd8d2c0fd34c81497
 ```
 
+各レジストリエントリはターゲットの `hailo_arch`(例：`hailo8`)も宣言します。
+実際の `registry load` サブコマンドは、上記のチェックサム検証と実際の
+アーキテクチャ互換性検証を組み合わせ、両方が通った場合にのみモデルを
+準備完了として報告します：
+
+```bash
+./run.sh registry load --registry registry.json --models-dir models/ --name pcb-defect --target-arch hailo8
+# READY: pcb-defect 0.2.0 (hailo8) verified and ready
+
+./run.sh registry load --registry registry.json --models-dir models/ --name pcb-defect --target-arch hailo15h
+# REJECTED_ARCH_MISMATCH: model compiled for 'hailo8', this deployment targets 'hailo15h'
+```
+
 ```bat
 :: Windows - 手順は同じ、バッチ構文
 build.bat
@@ -176,7 +193,7 @@ run.bat
 
 ## 🚀 現在の状況と次のステップ
 
-**今日実現していること：** モデルレジストリ——スキーマ検証、重複バージョンの検出、最新バージョンの検索、sha256 による整合性検証（`registry.py`、21 個のテスト）——に加え、検証済みのエントリポイントを持つ実際のインストール
+**今日実現していること：** モデルレジストリ——スキーマ検証(必須の、検証済みの Hailo アーキテクチャメタデータを含む)、重複バージョンの検出、最新バージョンの検索、sha256 による整合性検証（`registry.py`）——に加え、アーキテクチャ互換性とチェックサムの整合性を一緒にチェックし、両方が通った場合にのみモデルを準備完了として報告する実際の組み合わせ安全ロードゲート（`compatibility.py`）、合計 32 個のテスト、さらに検証済みのエントリポイントを持つ実際のインストール
 可能な Python パッケージ、そしてビルドに組み込まれた
 オドメーター式バージョンインクリメント。実際に取得されたビルド/実行出力については
 [`CHANGELOG.md`](CHANGELOG.md) を参照してください。

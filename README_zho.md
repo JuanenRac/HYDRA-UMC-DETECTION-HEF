@@ -28,6 +28,7 @@
 ### 关键要点
 
 * ✅ **真实 v0 —— 模型注册表：** `registry.py` 解析并按模式校验已编译模型的 JSON 注册表，检测重复的名称+版本条目，按名称/任务查找最新版本，并对本地 `.hef` 文件进行 sha256 校验和核对。通过下方的 `registry validate`/`registry latest` 暴露——运行或测试都不需要 Hailo SDK 或硬件。
+* 🔒 **真实 v0 —— 安全加载关卡：** `compatibility.py` 的 `safe_load()` 会先校验真实的 Hailo 架构兼容性（`hailo8`/`hailo15h` 等——现在每条注册表条目都会声明自己的目标芯片），然后再校验校验和，只有两项真实检查都通过时才会报告某个模型已准备好部署。通过下方的 `registry load` 暴露。
 * 🛠️ **工业检测（计划中）：** 针对 PCB 组件、焊点和机械缺陷的模型。
 * 📐 **基准点对位（计划中）：** 用于抓取放置同步的高精度锚点。
 * ⚡ **量化性能（计划中）：** 针对 Hailo-8/Hailo-10 NPU 的 INT8/INT4 变体，实现亚 10ms 推理。*（未来工作——需要本环境尚不具备的真实 Hailo-8/Hailo-10 NPU 和 Dataflow Compiler。）*
@@ -75,6 +76,8 @@ INT8/INT4 量化（生成 `.har`），最后打包为 [HYDRA-UMC-VISION-NODE](ht
 * **版本从已安装的包元数据读取，而非硬编码** —— `main.py` 调用 `importlib.metadata.version("hydra-umc-detection-hef")`，而非第二个 `__version__` 字符串，因此 `bump_version.py` 永远只有一处需要修改。
 * **里程表式递增只自动触及 `PATCH`/`MINOR`** —— `bump_version.py` 在 `PATCH` 超过 9 时进位到 `MINOR`，`MINOR` 超过 9 时进位到 `MAJOR`，但从不自行递增 `MAJOR`；与 `HYDRA-UMC-EDITOR-URDF/bump_version.py` 和 `HYDRA-UMC-SUITE/bump_version.py` 的惯例相同。
 * **本地缺失的 `.hef` 文件不算校验和失败** —— 当注册表所描述的文件在 `--models-dir` 下不存在时，`verify_checksum()` 返回 `None`（而非 `False`），`registry validate` 将其报告为"skipped"，而非错误。注册表所描述的模型可能存放在一个独立的对象存储中，未必纳入本仓库——只有对一个确实存在的文件计算出真正不一致的校验和，才代表注册表已损坏。
+* **为何 `safe_load()` 先检查架构再检查校验和，而不是反过来。** 架构兼容性是纯粹的元数据（无需 I/O）；校验和验证则需要读取真实文件。先检查这个廉价、根本性的关卡，意味着一个为错误 Hailo 芯片编译的模型会在文件系统被真正触碰之前就被拒绝，而拒绝理由指出的是真正失败的根本性检查，而不是对一个本来就永远不会在这个硬件上运行的模型给出一个误导性的"文件缺失"。
+* **为何架构兼容性是精确匹配，而不是一张兼容性矩阵。** Hailo Dataflow Compiler 在编译时就把目标芯片烙进了 `.hef` 里——比如声称 Hailo-15H 可以运行一个 Hailo-8 的 `.hef`，需要在真实硬件上做真正的跨架构验证，而这个环境并不具备。精确匹配是仅凭注册表元数据就能诚实验证的唯一兼容性主张。
 
 ---
 
@@ -84,8 +87,9 @@ INT8/INT4 量化（生成 `.har`），最后打包为 [HYDRA-UMC-VISION-NODE](ht
 HYDRA-UMC-DETECTION-HEF/
 ├── src/                 # 源代码（hydra_umc_detection_hef 包）
 │   └── hydra_umc_detection_hef/
-│       ├── registry.py  # 模型注册表：模式校验、版本管理、sha256 校验和
-│       └── main.py      # CLI 入口点（裸调用 + `registry`）
+│       ├── registry.py       # 模型注册表：模式校验、版本管理、sha256 校验和
+│       ├── compatibility.py  # 真实的安全加载关卡：架构兼容性 + 校验和
+│       └── main.py           # CLI 入口点（裸调用 + `registry`）
 ├── tests/               # 真实 pytest 套件（registry、CLI）
 ├── docs/                # 文档与验证报告
 ├── build/               # 构建输出（本地 .venv + 未来的 HEF 工具链输出）
@@ -123,7 +127,7 @@ HYDRA-UMC-DETECTION-HEF/
 2. **虚拟环境** —— 若 `.venv/` 不存在则创建；否则复用。
 3. **可编辑安装** —— `pip install -e ".[dev]"`，使 `src/` 下的修改立即生效，安装 `pytest`，并注册 `hydra-umc-detection-hef` 控制台入口点。
 4. **编译检查** —— `python -m compileall -q src` 对 `src/` 下每个文件进行字节码编译，在整个生态系统范围内捕获语法错误。
-5. **真实测试套件** —— `python -m pytest tests/ -q`（21 个测试，覆盖注册表和 CLI）。
+5. **真实测试套件** —— `python -m pytest tests/ -q`（32 个测试，覆盖注册表、安全加载关卡和 CLI）。
 
 `set -euo pipefail` 会在第一个失败步骤处停止脚本；只有全部 5 个步骤均
 成功时，构建才会报告成功。
@@ -152,6 +156,18 @@ HYDRA-UMC-DETECTION-HEF/
 # sha256: 1c8a52bb4a34927d55efc913b23f06bd08ff5eeee0aca2ccd8d2c0fd34c81497
 ```
 
+每条注册表条目还会声明自己的目标 `hailo_arch`（例如 `hailo8`）。真实的
+`registry load` 子命令会把上面的校验和检查与一次真实的架构兼容性检查
+结合在一起，只有两者都通过时才会报告模型已就绪：
+
+```bash
+./run.sh registry load --registry registry.json --models-dir models/ --name pcb-defect --target-arch hailo8
+# READY: pcb-defect 0.2.0 (hailo8) verified and ready
+
+./run.sh registry load --registry registry.json --models-dir models/ --name pcb-defect --target-arch hailo15h
+# REJECTED_ARCH_MISMATCH: model compiled for 'hailo8', this deployment targets 'hailo15h'
+```
+
 ```bat
 :: Windows - 步骤相同，批处理语法
 build.bat
@@ -169,7 +185,7 @@ run.bat
 
 ## 🚀 当前状态与后续步骤
 
-**今天已实现的内容：** 模型注册表——模式校验、重复版本检测、最新版本查找、以及 sha256 完整性校验（`registry.py`，21 个测试）——加上一个真实的、可安装的 Python 包，带有已验证的入口点，以及一个已接入构建流程的里程表式版本递增机制。具体已捕获的构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
+**今天已实现的内容：** 模型注册表——模式校验（包括必须提供且经过校验的 Hailo 架构元数据）、重复版本检测、最新版本查找、以及 sha256 完整性校验（`registry.py`）——加上一个真实的、组合式的安全加载关卡，会一起检查架构兼容性和校验和完整性，只有两者都通过时才会报告模型就绪（`compatibility.py`），共 32 个测试，再加上一个真实的、可安装的 Python 包，带有已验证的入口点，以及一个已接入构建流程的里程表式版本递增机制。具体已捕获的构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 **仍待完成、顺序不分先后、无既定时间表、且受限于真实 Hailo 硬件的内容：**
 

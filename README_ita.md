@@ -26,13 +26,14 @@ Questo è uno dei 4 figli di **[HYDRA-UMC-VISION-NODE](https://github.com/Juanen
 ### Punti Chiave
 
 * ✅ **Reale v0 - registro modelli:** `registry.py` analizza e valida per schema un registro JSON di modelli compilati, rileva voci duplicate nome+versione, trova l'ultima versione per un nome/task, e verifica i file `.hef` locali tramite checksum sha256 rispetto al registro. Esposto tramite `registry validate`/`registry latest` più sotto - non serve SDK Hailo né hardware per eseguirlo o testarlo.
+* 🔒 **Reale v0 - verifica di caricamento sicuro:** `safe_load()` di `compatibility.py` verifica la compatibilità reale dell'architettura Hailo (`hailo8`/`hailo15h`/ecc. - ogni voce del registro ora dichiara il proprio chip target) prima di verificare il checksum, e non riporta mai un modello pronto per il deploy a meno che entrambi i controlli reali non passino. Esposto tramite `registry load` più sotto.
 * 🛠️ **Rilevamento Industriale (previsto):** modelli mirati a componenti PCB, saldature e difetti meccanici.
 * 📐 **Allineamento Fiduciali (previsto):** riferimenti ad alta precisione per la sincronizzazione Pick-and-Place.
 * ⚡ **Prestazioni Quantizzate (previsto):** varianti INT8/INT4 mirate alle NPU Hailo-8/Hailo-10 per inferenza sub-10ms. *(lavoro futuro - richiede la vera NPU Hailo-8/Hailo-10 e il Dataflow Compiler che questo ambiente non ha.)*
 * 🤖 **Stima della Posa (previsto):** rilevamento di keypoint per il tracciamento delle articolazioni del braccio robotico. *(lavoro futuro, stesso motivo.)*
 * 🧩 **Perché esiste come progetto separato:** compilare e versionare modelli è un flusso di lavoro dati/ML, completamente diverso dal processo di esecuzione che li serve - mantenere la toolchain qui significa che una compilazione errata non mette mai a rischio il nodo di percezione in esecuzione, e i modelli possono essere iterati e validati offline prima di raggiungere [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE).
 
-**Verifica di onestà - cosa funziona davvero oggi:** la metà reale e indipendente dall'hardware del lavoro di questo progetto - il registro di modelli (`registry.py`, `registry validate`/`registry latest`) - è implementata e testata (21 test). L'esportazione ONNX, la quantizzazione tramite Hailo Dataflow Compiler e il pacchettizzazione HAR/HEF che produrrebbero davvero i modelli descritti da questo registro restano lavoro futuro: richiedono vero hardware Hailo che questo ambiente non ha. Vedi [`CHANGELOG.md`](CHANGELOG.md) per ciò che è stato consegnato esattamente finora, e "Stato Attuale e Prossimi Passi" più sotto per ciò che resta aperto.
+**Verifica di onestà - cosa funziona davvero oggi:** la metà reale e indipendente dall'hardware del lavoro di questo progetto - il registro di modelli (`registry.py`) e la reale verifica di caricamento sicuro (`compatibility.py`), esposti tramite `registry validate`/`registry latest`/`registry load` - è implementata e testata (32 test). L'esportazione ONNX, la quantizzazione tramite Hailo Dataflow Compiler e il pacchettizzazione HAR/HEF che produrrebbero davvero i modelli descritti da questo registro restano lavoro futuro: richiedono vero hardware Hailo che questo ambiente non ha. Vedi [`CHANGELOG.md`](CHANGELOG.md) per ciò che è stato consegnato esattamente finora, e "Stato Attuale e Prossimi Passi" più sotto per ciò che resta aperto.
 
 ---
 
@@ -66,6 +67,8 @@ Il diagramma sopra fissa già la forma prevista della pipeline: l'addestramento 
 * **La versione viene letta dai metadati del pacchetto installato, non è hardcoded** - `main.py` chiama `importlib.metadata.version("hydra-umc-detection-hef")` invece di una seconda stringa `__version__`, così `bump_version.py` ha un solo posto da modificare.
 * **L'incremento "contachilometri" tocca automaticamente solo `PATCH`/`MINOR`** - `bump_version.py` riporta `PATCH` a `MINOR` oltre il 9 e da `MINOR` a `MAJOR` oltre il 9, ma non incrementa mai `MAJOR` da solo; stessa convenzione di `HYDRA-UMC-EDITOR-URDF/bump_version.py` e `HYDRA-UMC-SUITE/bump_version.py`.
 * **Un file `.hef` locale mancante non è un fallimento di checksum** - `verify_checksum()` restituisce `None` (non `False`) quando il file descritto dal registro non è presente sotto `--models-dir`, e `registry validate` lo segnala come "skipped", non come errore. Il registro è pensato per descrivere modelli che possono vivere in un object store separato, non necessariamente incluso in questo repo - solo un checksum realmente discordante per un file effettivamente presente indica un registro corrotto.
+* **Perché `safe_load()` controlla l'architettura prima del checksum, non il contrario.** La compatibilità dell'architettura è pura metadata (nessun I/O); la verifica del checksum deve leggere un file reale. Controllare prima la verifica economica e fondamentale significa che un modello compilato per il chip Hailo sbagliato viene rifiutato prima ancora di toccare il filesystem, e il motivo del rifiuto nomina il controllo fondamentale che è realmente fallito invece di un fuorviante "file mancante" per un modello che comunque non sarebbe mai girato su questo hardware.
+* **Perché la compatibilità dell'architettura è corrispondenza esatta, non una matrice di compatibilità.** Il Hailo Dataflow Compiler incide il chip target in un `.hef` al momento della compilazione - affermare ad esempio che un Hailo-15H può eseguire un `.hef` Hailo-8 richiederebbe una validazione incrociata tra architetture su hardware reale che questo ambiente non ha. La corrispondenza esatta è l'unica affermazione di compatibilità onestamente verificabile solo dalla metadata del registro.
 
 ---
 
@@ -75,8 +78,9 @@ Il diagramma sopra fissa già la forma prevista della pipeline: l'addestramento 
 HYDRA-UMC-DETECTION-HEF/
 ├── src/                 # Codice sorgente (pacchetto hydra_umc_detection_hef)
 │   └── hydra_umc_detection_hef/
-│       ├── registry.py  # Registro modelli: validazione per schema, versionamento, checksum sha256
-│       └── main.py      # Entry point CLI (invocazione nuda + `registry`)
+│       ├── registry.py       # Registro modelli: validazione per schema, versionamento, checksum sha256
+│       ├── compatibility.py  # Vera verifica di caricamento sicuro: compatibilità + checksum
+│       └── main.py           # Entry point CLI (invocazione nuda + `registry`)
 ├── tests/               # Suite pytest reale (registry, CLI)
 ├── docs/                # Documentazione e report di validazione
 ├── build/               # Output di build (.venv locale + futuro output toolchain HEF)
@@ -112,7 +116,7 @@ Nessuna cartella `hardware/`, `firmware/`, `os/` o `models/` - vedi "Informazion
 2. **Ambiente virtuale** - crea `.venv/` se manca; lo riutilizza altrimenti.
 3. **Installazione editabile** - `pip install -e ".[dev]"` così le modifiche sotto `src/` hanno effetto immediato, installa `pytest`, e registra l'entry point da console `hydra-umc-detection-hef`.
 4. **Compile-check** - `python -m compileall -q src` compila in bytecode ogni file sotto `src/`.
-5. **Suite di test reale** - `python -m pytest tests/ -q` (21 test che coprono il registro e il CLI).
+5. **Suite di test reale** - `python -m pytest tests/ -q` (32 test che coprono il registro, la verifica di caricamento sicuro e il CLI).
 
 `set -euo pipefail` ferma lo script al primo passo che fallisce; il build segnala successo solo se tutti e 5 i passi hanno successo.
 
@@ -138,6 +142,16 @@ Esempio reale - validare un registro e cercare l'ultima versione di un modello:
 # sha256: 1c8a52bb4a34927d55efc913b23f06bd08ff5eeee0aca2ccd8d2c0fd34c81497
 ```
 
+Ogni voce del registro dichiara anche il proprio `hailo_arch` target (es. `hailo8`). Il vero sottocomando `registry load` combina la verifica del checksum di cui sopra con una vera verifica di compatibilità dell'architettura, e riporta un modello pronto solo se entrambe passano:
+
+```bash
+./run.sh registry load --registry registry.json --models-dir models/ --name pcb-defect --target-arch hailo8
+# READY: pcb-defect 0.2.0 (hailo8) verified and ready
+
+./run.sh registry load --registry registry.json --models-dir models/ --name pcb-defect --target-arch hailo15h
+# REJECTED_ARCH_MISMATCH: model compiled for 'hailo8', this deployment targets 'hailo15h'
+```
+
 ```bat
 :: Windows - stessi passi, sintassi batch
 build.bat
@@ -155,7 +169,7 @@ run.bat
 
 ## 🚀 Stato Attuale e Prossimi Passi
 
-**Cosa funziona oggi:** il registro di modelli - validazione per schema, rilevamento versioni duplicate, ricerca dell'ultima versione, e verifica di integrità tramite sha256 (`registry.py`, 21 test) - più un vero pacchetto Python installabile con un entry point verificato e un incremento di versione contachilometri integrato nel build. Vedi [`CHANGELOG.md`](CHANGELOG.md) per l'output di build/run catturato.
+**Cosa funziona oggi:** il registro di modelli - validazione per schema (inclusi metadati di architettura Hailo richiesti e validati), rilevamento versioni duplicate, ricerca dell'ultima versione, e verifica di integrità tramite sha256 (`registry.py`) - più una vera verifica combinata di caricamento sicuro che controlla compatibilità dell'architettura e integrità del checksum insieme e non riporta mai un modello pronto a meno che entrambi non passino (`compatibility.py`), 32 test in totale, più un vero pacchetto Python installabile con un entry point verificato e un incremento di versione contachilometri integrato nel build. Vedi [`CHANGELOG.md`](CHANGELOG.md) per l'output di build/run catturato.
 
 **Cosa resta aperto, senza ordine particolare, senza calendario impegnato, e bloccato da vero hardware Hailo:**
 
