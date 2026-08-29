@@ -64,6 +64,15 @@ def test_load_registry_unknown_hailo_arch(tmp_path):
         load_registry(reg_path)
 
 
+def test_load_registry_rejects_absolute_hef_path(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    bad = _entry()
+    bad["hef_path"] = str(tmp_path / "outside" / "evil.hef")
+    _write_registry(reg_path, [bad])
+    with pytest.raises(RegistryError):
+        load_registry(reg_path)
+
+
 def test_load_registry_accepts_every_known_hailo_arch(tmp_path):
     from hydra_umc_detection_hef.registry import KNOWN_HAILO_ARCHS
 
@@ -158,3 +167,55 @@ def test_verify_checksum_missing_file_returns_none(tmp_path):
     entry = load_registry(reg_path)[0]
 
     assert verify_checksum(entry, tmp_path / "nowhere") is None
+
+
+def test_verify_checksum_rejects_path_traversal(tmp_path):
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    outside = tmp_path / "outside.hef"
+    outside.write_bytes(b"secret bytes outside models_dir")
+
+    reg_path = tmp_path / "registry.json"
+    bad = _entry()
+    bad["hef_path"] = "../../../../outside.hef"
+    _write_registry(reg_path, [bad])
+    entry = load_registry(reg_path)[0]
+
+    with pytest.raises(RegistryError):
+        verify_checksum(entry, models_dir)
+
+
+def test_verify_checksum_rejects_traversal_into_prefix_matching_sibling(tmp_path):
+    # A naive str.startswith(str(models_dir)) containment check would
+    # wrongly let this through, since "models_evil" starts with "models".
+    # The real fix resolves both paths and checks real containment.
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    evil_sibling = tmp_path / "models_evil"
+    evil_sibling.mkdir()
+    (evil_sibling / "secret.hef").write_bytes(b"secret bytes in sibling dir")
+
+    reg_path = tmp_path / "registry.json"
+    bad = _entry()
+    bad["hef_path"] = "../models_evil/secret.hef"
+    _write_registry(reg_path, [bad])
+    entry = load_registry(reg_path)[0]
+
+    with pytest.raises(RegistryError):
+        verify_checksum(entry, models_dir)
+
+
+def test_verify_checksum_allows_legitimate_relative_subdirectory(tmp_path):
+    content = b"fake hef bytes"
+    digest = hashlib.sha256(content).hexdigest()
+    models_dir = tmp_path / "models"
+    (models_dir / "v1").mkdir(parents=True)
+    (models_dir / "v1" / "pcb-defect-0.1.0.hef").write_bytes(content)
+
+    reg_path = tmp_path / "registry.json"
+    good = _entry(sha256=digest)
+    good["hef_path"] = "v1/pcb-defect-0.1.0.hef"
+    _write_registry(reg_path, [good])
+    entry = load_registry(reg_path)[0]
+
+    assert verify_checksum(entry, models_dir) is True

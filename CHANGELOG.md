@@ -10,6 +10,11 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
+## [0.0.5] - Fix: registry `hef_path` path-traversal escape from `models_dir`
+
+- **`registry.py`** - found in a live ecosystem bug audit: `_parse_entry()` only checked `hef_path` for being non-empty, and `verify_checksum()` joined it onto `models_dir` and read/hashed the result without ever confirming the join stayed inside `models_dir`. A registry entry with `hef_path` set to a traversal sequence (e.g. `../../../../etc/passwd`) or an absolute path could make `verify_checksum()`/`safe_load()` checksum an arbitrary local file outside the registry's own models directory. `_parse_entry()` now rejects an absolute `hef_path` outright; `verify_checksum()` resolves the joined path and `models_dir` and requires the former to actually be `models_dir` or a real descendant of it (`Path.is_relative_to()` on the resolved paths, not a `str.startswith()` prefix check, which a sibling directory like `models_dir_evil` would falsely pass) before ever touching the filesystem, raising `RegistryError` on an escape attempt the same way the rest of entry validation does.
+- 4 new tests: an absolute `hef_path` is rejected at `load_registry()` time; a relative traversal `hef_path` (`../../../../outside.hef`) is rejected by `verify_checksum()`; a traversal into a sibling directory whose name merely starts with `models_dir`'s name is rejected too, proving the fix isn't a naive prefix check; a legitimate relative `hef_path` in a subdirectory still verifies correctly. Full suite (36 tests) passes.
+
 ## [0.0.4] - Real safe-load gate: Hailo-architecture compatibility + checksum
 
 - **`registry.py`** - `ModelEntry` gains a required `hailo_arch` field, validated at load time against `KNOWN_HAILO_ARCHS` (the real Hailo NPU family identifiers a compiled `.hef` targets: `hailo8`/`hailo8r`/`hailo8l`/`hailo15h`/`hailo15m`/`hailo15l`/`hailo10h`) - a typo'd or invented architecture name is now caught at registry-validation time instead of surfacing as a mysterious load failure on real hardware later.

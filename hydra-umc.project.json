@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "ecosystem": "HYDRA-UMC",
   "name": "HYDRA-UMC-DETECTION-HEF",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "role": "library",
   "stack": "python",
   "technologies": [
@@ -15,7 +15,7 @@
   "family": "Vision AI Node",
   "parent": "HYDRA-UMC-VISION-NODE",
   "build": "Requires Hailo runtime/SDK on the real CM5 for the compilation toolchain itself (ONNX export, Dataflow Compiler, HEF packaging); the model registry (registry.py) needs neither.",
-  "notes": "Established v0: real compiled-model registry - JSON schema validation (including a required, validated hailo_arch field), duplicate-version detection, latest-version lookup by name/task, and sha256 checksum verification against local files, exposed via 'registry validate'/'registry latest'. Real, combined safe-load gate (compatibility.py's safe_load()) checks Hailo-architecture compatibility before checksum integrity and never reports a model ready unless both real checks pass - exposed via the new 'registry load' subcommand. 32 tests. The ONNX/Dataflow-Compiler/HEF toolchain that would populate the registry still needs real Hailo hardware and is future work.",
+  "notes": "Established v0: real compiled-model registry - JSON schema validation (including a required, validated hailo_arch field), duplicate-version detection, latest-version lookup by name/task, and sha256 checksum verification against local files, exposed via 'registry validate'/'registry latest'. Real, combined safe-load gate (compatibility.py's safe_load()) checks Hailo-architecture compatibility before checksum integrity and never reports a model ready unless both real checks pass - exposed via the new 'registry load' subcommand. hef_path is now validated against path traversal (rejects an absolute path at parse time, and verify_checksum() confirms the resolved join stays inside models_dir) before any file is read or hashed. 36 tests. The ONNX/Dataflow-Compiler/HEF toolchain that would populate the registry still needs real Hailo hardware and is future work.",
   "native_version": {
     "file": "pyproject.toml",
     "pattern": "^version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\""

@@ -78,6 +78,8 @@ def _parse_entry(raw: dict, index: int) -> ModelEntry:
 
     if not raw["hef_path"]:
         raise RegistryError(f"entry {index}: hef_path must not be empty")
+    if Path(raw["hef_path"]).is_absolute():
+        raise RegistryError(f"entry {index}: hef_path {raw['hef_path']!r} must be a relative path")
     if not re.fullmatch(r"[0-9a-fA-F]{64}", raw["sha256"]):
         raise RegistryError(f"entry {index}: sha256 must be a 64-char hex digest")
     if raw["hailo_arch"] not in KNOWN_HAILO_ARCHS:
@@ -139,8 +141,24 @@ def verify_checksum(entry: ModelEntry, models_dir: Path) -> bool | None:
     checked into this repo, so a missing local file isn't automatically a
     corrupt registry - only a mismatched checksum for a file that *is*
     present is.
+
+    `entry.hef_path` comes from the registry JSON, which may be corrupt
+    or untrusted - `_parse_entry` already rejects an absolute hef_path,
+    but a relative one can still climb out of `models_dir` with enough
+    `../` segments. Confining the *resolved* join target back under the
+    *resolved* `models_dir` (rather than a naive string-prefix check,
+    which a sibling directory like `models_dir_evil` would falsely pass)
+    is what actually keeps this a safe-load gate rather than an arbitrary
+    local file read.
     """
     file_path = models_dir / entry.hef_path
+    models_dir_resolved = models_dir.resolve()
+    resolved_path = file_path.resolve()
+    if not resolved_path.is_relative_to(models_dir_resolved):
+        raise RegistryError(
+            f"model {entry.name!r} {entry.version!r}: hef_path {entry.hef_path!r} "
+            f"resolves outside models_dir {models_dir}"
+        )
     if not file_path.is_file():
         return None
     return compute_sha256(file_path) == entry.sha256
