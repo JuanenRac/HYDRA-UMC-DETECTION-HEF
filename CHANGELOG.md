@@ -10,6 +10,12 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
+## Unreleased - strict registry entry types
+
+- Registry entries now require a JSON object and strictly typed textual and
+  array fields. Malformed metadata cannot reach path/version handling through
+  implicit Python coercion or a raw `TypeError`.
+
 ## [0.0.5] - Fix: registry `hef_path` path-traversal escape from `models_dir`
 
 - **`registry.py`** - found in a live ecosystem bug audit: `_parse_entry()` only checked `hef_path` for being non-empty, and `verify_checksum()` joined it onto `models_dir` and read/hashed the result without ever confirming the join stayed inside `models_dir`. A registry entry with `hef_path` set to a traversal sequence (e.g. `../../../../etc/passwd`) or an absolute path could make `verify_checksum()`/`safe_load()` checksum an arbitrary local file outside the registry's own models directory. `_parse_entry()` now rejects an absolute `hef_path` outright; `verify_checksum()` resolves the joined path and `models_dir` and requires the former to actually be `models_dir` or a real descendant of it (`Path.is_relative_to()` on the resolved paths, not a `str.startswith()` prefix check, which a sibling directory like `models_dir_evil` would falsely pass) before ever touching the filesystem, raising `RegistryError` on an escape attempt the same way the rest of entry validation does.

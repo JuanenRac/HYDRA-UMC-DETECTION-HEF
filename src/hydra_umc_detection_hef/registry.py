@@ -55,34 +55,40 @@ class ModelEntry:
         return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
 
 
-def _parse_entry(raw: dict, index: int) -> ModelEntry:
+def _parse_entry(raw: object, index: int) -> ModelEntry:
+    if not isinstance(raw, dict):
+        raise RegistryError(f"entry {index}: entry must be a JSON object")
     required = ("name", "version", "task", "input_shape", "classes", "hef_path", "sha256", "hailo_arch")
     missing = [field for field in required if field not in raw]
     if missing:
         raise RegistryError(f"entry {index}: missing field(s) {missing}")
 
-    if not raw["name"]:
+    if not isinstance(raw["name"], str) or not raw["name"].strip():
         raise RegistryError(f"entry {index}: name must not be empty")
-    if _VERSION_RE.match(raw["version"]) is None:
+    if not isinstance(raw["version"], str) or _VERSION_RE.match(raw["version"]) is None:
         raise RegistryError(f"entry {index}: version {raw['version']!r} must look like X.Y.Z")
-    if not raw["task"]:
+    if not isinstance(raw["task"], str) or not raw["task"].strip():
         raise RegistryError(f"entry {index}: task must not be empty")
 
+    if not isinstance(raw["input_shape"], list):
+        raise RegistryError(f"entry {index}: input_shape must be an array")
     input_shape = tuple(raw["input_shape"])
     if not input_shape or any(not isinstance(d, int) or d <= 0 for d in input_shape):
         raise RegistryError(f"entry {index}: input_shape must be non-empty positive integers")
 
+    if not isinstance(raw["classes"], list):
+        raise RegistryError(f"entry {index}: classes must be an array")
     classes = tuple(raw["classes"])
-    if not classes:
+    if not classes or any(not isinstance(label, str) or not label.strip() for label in classes):
         raise RegistryError(f"entry {index}: classes must not be empty")
 
-    if not raw["hef_path"]:
+    if not isinstance(raw["hef_path"], str) or not raw["hef_path"].strip():
         raise RegistryError(f"entry {index}: hef_path must not be empty")
     if Path(raw["hef_path"]).is_absolute():
         raise RegistryError(f"entry {index}: hef_path {raw['hef_path']!r} must be a relative path")
-    if not re.fullmatch(r"[0-9a-fA-F]{64}", raw["sha256"]):
+    if not isinstance(raw["sha256"], str) or not re.fullmatch(r"[0-9a-fA-F]{64}", raw["sha256"]):
         raise RegistryError(f"entry {index}: sha256 must be a 64-char hex digest")
-    if raw["hailo_arch"] not in KNOWN_HAILO_ARCHS:
+    if not isinstance(raw["hailo_arch"], str) or raw["hailo_arch"] not in KNOWN_HAILO_ARCHS:
         raise RegistryError(
             f"entry {index}: hailo_arch {raw['hailo_arch']!r} is not a known Hailo architecture "
             f"({sorted(KNOWN_HAILO_ARCHS)}) - catches a typo'd or invented arch name at "

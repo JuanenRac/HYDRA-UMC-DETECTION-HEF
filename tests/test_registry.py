@@ -90,6 +90,19 @@ def test_load_registry_not_a_list(tmp_path):
         load_registry(reg_path)
 
 
+def test_load_registry_rejects_non_object_entry_and_non_text_fields(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    _write_registry(reg_path, ["not an entry"])
+    with pytest.raises(RegistryError, match="JSON object"):
+        load_registry(reg_path)
+
+    invalid = _entry()
+    invalid["name"] = 7
+    _write_registry(reg_path, [invalid])
+    with pytest.raises(RegistryError, match="name"):
+        load_registry(reg_path)
+
+
 def test_load_registry_malformed_json(tmp_path):
     reg_path = tmp_path / "registry.json"
     reg_path.write_text("{not json", encoding="utf-8")
