@@ -1,6 +1,6 @@
 [project]
 name = "hydra-umc-detection-hef"
-version = "0.0.5"
+version = "0.0.6"
 description = "Library and toolchain of hardware-accelerated YOLO detection models compiled to Hailo Executable Format (HEF), tuned for industrial micro-factory inspection on Hailo-8/Hailo-10."
 readme = "README.md"
 requires-python = ">=3.10"

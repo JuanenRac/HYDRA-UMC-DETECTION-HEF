@@ -21,6 +21,7 @@ import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+from .api import RegistryServer
 from .compatibility import safe_load
 from .registry import RegistryError, duplicate_versions, find_latest, load_registry, verify_checksum
 
@@ -120,6 +121,21 @@ def _cmd_registry_load(args: argparse.Namespace) -> int:
     return 1
 
 
+def _cmd_serve(args: argparse.Namespace) -> int:
+    models_dir = Path(args.models_dir) if args.models_dir else None
+    server = RegistryServer((args.addr, args.port), Path(args.registry), models_dir)
+    print(f"[detection-hef] HTTP API listening on {args.addr}:{args.port} (registry={args.registry})")
+    print("[detection-hef] GET /registry, GET /registry/latest, GET /registry/load, GET /stats")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+        print("[detection-hef] shutting down")
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hydra-umc-detection-hef")
     subparsers = parser.add_subparsers(dest="command")
@@ -149,6 +165,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "--target-arch", required=True, help="Hailo architecture of this deployment (e.g. hailo8)"
     )
     load.set_defaults(func=_cmd_registry_load)
+
+    serve = subparsers.add_parser(
+        "serve",
+        help="Run the registry validate/latest/load queries as a JSON/HTTP API "
+             "(GET /registry, GET /registry/latest, GET /registry/load) - registry "
+             "and models directory are configured once at startup, not per-request.",
+    )
+    serve.add_argument("--registry", required=True, help="Path to the registry JSON file")
+    serve.add_argument("--models-dir", default=None, help="Directory containing the .hef files, needed for GET /registry/load")
+    serve.add_argument("--addr", default="127.0.0.1", help="address to bind the HTTP API to")
+    serve.add_argument("--port", type=int, default=8093, help="port for the HTTP API")
+    serve.set_defaults(func=_cmd_serve)
 
     return parser
 

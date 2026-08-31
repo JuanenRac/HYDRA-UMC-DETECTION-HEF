@@ -16,6 +16,31 @@ hand.
   array fields. Malformed metadata cannot reach path/version handling through
   implicit Python coercion or a raw `TypeError`.
 
+## [0.0.6] - Real v0: JSON/HTTP server mode, plus CM5 deployment
+
+- **`api.py`** (new) - `GET /registry`, `GET /registry/latest`, and
+  `GET /registry/load` reach the exact same `registry.py`/
+  `compatibility.py` functions the CLI's `registry validate/latest/load`
+  subcommands already run. Registry path and models directory are
+  configured ONCE at server startup (`--registry`/`--models-dir`), unlike
+  the CLI, which takes its own `--registry` per invocation - a real
+  deployed registry server has one registry to serve, not an arbitrary
+  path chosen per request. Real gap this closes: this project's own
+  registry/safe-load logic was only ever reachable as a one-shot CLI.
+- **`main.py`** - new `serve` subcommand (`--registry`/`--models-dir`/
+  `--addr`/`--port`, default `127.0.0.1:8093`).
+- **`systemd/hydra-umc-detection-hef.service`** (new) - unit for
+  `HYDRA-UMC-OS/provisioning/install_detection_hef.sh` (new, that repo).
+  Registry config lives at `/etc/hydra-umc-detection-hef/` rather than
+  the shared `/etc/hydra-umc/` tree (0750 root:hydra-umc-agent) - same
+  real permission lesson learned installing HYDRA-UMC-NODE-HEALING.
+  Starts against a real, valid, empty registry (`[]`) - unlike
+  Node-Healing's watchdog, an empty registry here is a safely-servable
+  state (`GET /registry` returns zero entries, not a startup crash), so
+  this service is safe to enable/start immediately.
+- 11 new tests (`tests/test_api.py`, real end-to-end HTTP, reusing this
+  repo's own `tests/test_compatibility.py` fixture shapes) - 48 total.
+
 ## [0.0.5] - Fix: registry `hef_path` path-traversal escape from `models_dir`
 
 - **`registry.py`** - found in a live ecosystem bug audit: `_parse_entry()` only checked `hef_path` for being non-empty, and `verify_checksum()` joined it onto `models_dir` and read/hashed the result without ever confirming the join stayed inside `models_dir`. A registry entry with `hef_path` set to a traversal sequence (e.g. `../../../../etc/passwd`) or an absolute path could make `verify_checksum()`/`safe_load()` checksum an arbitrary local file outside the registry's own models directory. `_parse_entry()` now rejects an absolute `hef_path` outright; `verify_checksum()` resolves the joined path and `models_dir` and requires the former to actually be `models_dir` or a real descendant of it (`Path.is_relative_to()` on the resolved paths, not a `str.startswith()` prefix check, which a sibling directory like `models_dir_evil` would falsely pass) before ever touching the filesystem, raising `RegistryError` on an escape attempt the same way the rest of entry validation does.
