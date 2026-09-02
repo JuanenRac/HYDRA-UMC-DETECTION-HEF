@@ -89,14 +89,20 @@ HYDRA-UMC-DETECTION-HEF/
 │   └── hydra_umc_detection_hef/
 │       ├── registry.py       # 模型注册表：模式校验、版本管理、sha256 校验和
 │       ├── compatibility.py  # 真实的安全加载关卡：架构兼容性 + 校验和
+│       ├── api.py            # 简洁的 JSON/HTTP 接口(基于 stdlib http.server),桥接模型注册表
 │       └── main.py           # CLI 入口点（裸调用 + `registry`）
-├── tests/               # 真实 pytest 套件（registry、CLI）
+├── tests/               # 真实 pytest 套件（registry、compatibility、api、CLI）
 ├── docs/                # 文档与验证报告
 ├── build/               # 构建输出（本地 .venv + 未来的 HEF 工具链输出）
 ├── images/              # 媒体与图表
-├── scripts/             # 实用脚本
+├── systemd/
+│   └── hydra-umc-detection-hef.service # 本地 CM5 模型注册表 API 的 systemd 单元
+├── tools/
+│   ├── build_test.py    # 不递增版本号的构建检查
+│   └── ci_validate.py   # CI 使用的清单/CHANGELOG/文档校验
 ├── pyproject.toml       # 包元数据、依赖项、里程表版本号
-├── bump_version.py      # 里程表式版本递增（由 build.sh/.bat 运行）
+├── bump_version.py      # 原生版本的里程表式递增（由 build.sh/.bat 运行）
+├── bump_manifest_version.py # 将 hydra-umc.project.json 的版本与原生版本同步(--sync)
 ├── build.sh / build.bat # venv + 可编辑安装 + 编译检查 + 测试
 ├── run.sh / run.bat     # 从本地 venv 运行入口点
 └── CHANGELOG.md         # 逐版本历史（里程表方案，无日期）

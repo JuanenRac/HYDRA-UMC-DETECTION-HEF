@@ -80,14 +80,20 @@ HYDRA-UMC-DETECTION-HEF/
 │   └── hydra_umc_detection_hef/
 │       ├── registry.py       # Registro modelli: validazione per schema, versionamento, checksum sha256
 │       ├── compatibility.py  # Vera verifica di caricamento sicuro: compatibilità + checksum
+│       ├── api.py            # Superficie JSON/HTTP semplice (http.server di stdlib) sul registro modelli
 │       └── main.py           # Entry point CLI (invocazione nuda + `registry`)
-├── tests/               # Suite pytest reale (registry, CLI)
+├── tests/               # Suite pytest reale (registry, compatibility, api, CLI)
 ├── docs/                # Documentazione e report di validazione
 ├── build/               # Output di build (.venv locale + futuro output toolchain HEF)
 ├── images/              # Media e diagrammi
-├── scripts/             # Script di utilità
+├── systemd/
+│   └── hydra-umc-detection-hef.service # Unità systemd della API locale di registro modelli sulla CM5
+├── tools/
+│   ├── build_test.py    # Controllo build senza versionamento
+│   └── ci_validate.py   # Validazione manifest/CHANGELOG/docs usata dalla CI
 ├── pyproject.toml       # Metadati pacchetto, dipendenze, versione contachilometri
-├── bump_version.py      # Incremento versione tipo contachilometri (build.sh/.bat)
+├── bump_version.py      # Incremento versione nativa tipo contachilometri (build.sh/.bat)
+├── bump_manifest_version.py # Sincronizza la versione di hydra-umc.project.json con quella nativa (--sync)
 ├── build.sh / build.bat # venv + installazione editabile + compile-check + test
 ├── run.sh / run.bat     # Esegue l'entry point dal venv locale
 └── CHANGELOG.md         # Storico versione per versione (schema contachilometri, senza date)

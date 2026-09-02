@@ -95,14 +95,20 @@ HYDRA-UMC-DETECTION-HEF/
 │   └── hydra_umc_detection_hef/
 │       ├── registry.py       # モデルレジストリ：スキーマ検証、バージョン管理、sha256 チェックサム
 │       ├── compatibility.py  # 実際の安全なロードのゲート：アーキテクチャ互換性 + チェックサム
+│       ├── api.py            # シンプルなJSON/HTTPサーフェス(stdlibのhttp.server)。モデルレジストリを橋渡し
 │       └── main.py           # CLI エントリポイント（素の呼び出し + `registry`）
-├── tests/               # 実際の pytest スイート（registry、CLI）
+├── tests/               # 実際の pytest スイート（registry、compatibility、api、CLI）
 ├── docs/                # ドキュメントと検証レポート
 ├── build/               # ビルド出力（ローカルの .venv + 将来の HEF ツールチェーン出力）
 ├── images/              # メディアと図表
-├── scripts/             # ユーティリティスクリプト
+├── systemd/
+│   └── hydra-umc-detection-hef.service # ローカルCM5モデルレジストリAPIのsystemdユニット
+├── tools/
+│   ├── build_test.py    # バージョンを増やさないビルドチェック
+│   └── ci_validate.py   # CI が使用するマニフェスト/CHANGELOG/ドキュメント検証
 ├── pyproject.toml       # パッケージメタデータ、依存関係、オドメーターバージョン
-├── bump_version.py      # オドメーター式バージョンインクリメント（build.sh/.bat が実行）
+├── bump_version.py      # ネイティブバージョンのオドメーター式インクリメント（build.sh/.bat が実行）
+├── bump_manifest_version.py # hydra-umc.project.json のバージョンをネイティブ版と同期(--sync)
 ├── build.sh / build.bat # venv + editable インストール + コンパイルチェック + テスト
 ├── run.sh / run.bat     # ローカル venv からエントリポイントを実行
 └── CHANGELOG.md         # バージョンごとの履歴（オドメーター方式、日付なし）
