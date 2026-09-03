@@ -79,10 +79,10 @@ El diagrama de arriba ya fija la forma prevista del pipeline: el entrenamiento P
 HYDRA-UMC-DETECTION-HEF/
 ├── src/                 # Código fuente (paquete hydra_umc_detection_hef)
 │   └── hydra_umc_detection_hef/
-│       ├── registry.py       # Registro de modelos: validacion por esquema, versionado, checksums sha256
+│       ├── registry.py       # Registro de modelos: validación por esquema, versionado, checksums sha256
 │       ├── compatibility.py  # Verja real de carga segura: compatibilidad de arquitectura + checksum
 │       ├── api.py            # Superficie JSON/HTTP plana (http.server de stdlib) sobre el registro de modelos
-│       └── main.py           # Entry point CLI (invocacion desnuda + `registry` + `serve`)
+│       └── main.py           # Entry point CLI (invocación desnuda + `registry` + `serve`)
 ├── tests/               # Suite pytest real (registry, compatibility, api, CLI)
 ├── docs/
 │   └── CLI_REFERENCE.md # Referencia completa de la CLI + API JSON/HTTP, cada ejemplo capturado de una ejecución real
