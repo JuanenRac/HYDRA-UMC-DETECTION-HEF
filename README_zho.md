@@ -29,13 +29,14 @@
 
 * ✅ **真实 v0 —— 模型注册表：** `registry.py` 解析并按模式校验已编译模型的 JSON 注册表，检测重复的名称+版本条目，按名称/任务查找最新版本，并对本地 `.hef` 文件进行 sha256 校验和核对。通过下方的 `registry validate`/`registry latest` 暴露——运行或测试都不需要 Hailo SDK 或硬件。
 * 🔒 **真实 v0 —— 安全加载关卡：** `compatibility.py` 的 `safe_load()` 会先校验真实的 Hailo 架构兼容性（`hailo8`/`hailo15h` 等——现在每条注册表条目都会声明自己的目标芯片），然后再校验校验和，只有两项真实检查都通过时才会报告某个模型已准备好部署。通过下方的 `registry load` 暴露。
+* 🌐 **真实 v0 —— JSON/HTTP API：** `api.py` 的 `serve` 子命令将同样的注册表/安全加载检查作为一个长期运行的本地服务运行(默认 `127.0.0.1:8093`)，通过 `GET /registry`、`GET /registry/latest`、`GET /registry/load` 和 `GET /stats` 暴露——注册表和模型目录只在启动时配置一次，而非按每个请求配置。每个端点的真实抓取示例见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
 * 🛠️ **工业检测（计划中）：** 针对 PCB 组件、焊点和机械缺陷的模型。
 * 📐 **基准点对位（计划中）：** 用于抓取放置同步的高精度锚点。
 * ⚡ **量化性能（计划中）：** 针对 Hailo-8/Hailo-10 NPU 的 INT8/INT4 变体，实现亚 10ms 推理。*（未来工作——需要本环境尚不具备的真实 Hailo-8/Hailo-10 NPU 和 Dataflow Compiler。）*
 * 🤖 **姿态估计（计划中）：** 用于机械臂关节跟踪的关键点检测。*（未来工作，原因相同。）*
 * 🧩 **为何作为独立项目存在：** 编译和管理模型版本是一项数据/机器学习工作流，与提供服务的运行时进程完全不同——将工具链保持在此处，意味着一次糟糕的编译永远不会危及正在运行的感知节点，模型可以在到达 [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE) 之前离线迭代和验证。
 
-**诚实说明——今天实际运行的内容：** 本项目工作中真实、独立于硬件的那一半——模型注册表（`registry.py`、`registry validate`/`registry latest`）——已经实现并经过测试（48 个测试）。而真正*生产*这些注册表所描述模型的 ONNX 导出、Hailo Dataflow Compiler 量化和 HAR/HEF 打包步骤仍是未来工作：它们都需要本环境不具备的真实 Hailo 硬件。具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，尚待完成的
+**诚实说明——今天实际运行的内容：** 本项目工作中真实、独立于硬件的那一半——模型注册表（`registry.py`）和真实的安全加载关卡（`compatibility.py`）——通过 `registry validate`/`registry latest`/`registry load`，以及作为长期运行 JSON/HTTP API 的 `serve`（`api.py`）暴露，已经实现并经过测试（48 个测试）。而真正*生产*这些注册表所描述模型的 ONNX 导出、Hailo Dataflow Compiler 量化和 HAR/HEF 打包步骤仍是未来工作：它们都需要本环境不具备的真实 Hailo 硬件。具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，尚待完成的
 内容请参见下方"当前状态与后续步骤"章节。
 
 ---
@@ -90,9 +91,10 @@ HYDRA-UMC-DETECTION-HEF/
 │       ├── registry.py       # 模型注册表：模式校验、版本管理、sha256 校验和
 │       ├── compatibility.py  # 真实的安全加载关卡：架构兼容性 + 校验和
 │       ├── api.py            # 简洁的 JSON/HTTP 接口(基于 stdlib http.server),桥接模型注册表
-│       └── main.py           # CLI 入口点（裸调用 + `registry`）
+│       └── main.py           # CLI 入口点（裸调用 + `registry` + `serve`）
 ├── tests/               # 真实 pytest 套件（registry、compatibility、api、CLI）
-├── docs/                # 文档与验证报告
+├── docs/
+│   └── CLI_REFERENCE.md # 完整的 CLI + JSON/HTTP API 参考，每个示例均来自真实运行
 ├── build/               # 构建输出（本地 .venv + 未来的 HEF 工具链输出）
 ├── images/              # 媒体与图表
 ├── systemd/
@@ -174,6 +176,8 @@ HYDRA-UMC-DETECTION-HEF/
 # REJECTED_ARCH_MISMATCH: model compiled for 'hailo8', this deployment targets 'hailo15h'
 ```
 
+同样的注册表/安全加载检查也可以通过 `./run.sh serve --registry registry.json --models-dir models/`（默认 `127.0.0.1:8093`）作为长期运行的 JSON/HTTP API 使用。完整的命令与端点参考（每个示例均来自真实运行）见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
+
 ```bat
 :: Windows - 步骤相同，批处理语法
 build.bat
@@ -191,7 +195,7 @@ run.bat
 
 ## 🚀 当前状态与后续步骤
 
-**今天已实现的内容：** 模型注册表——模式校验（包括必须提供且经过校验的 Hailo 架构元数据）、重复版本检测、最新版本查找、以及 sha256 完整性校验（`registry.py`）——加上一个真实的、组合式的安全加载关卡，会一起检查架构兼容性和校验和完整性，只有两者都通过时才会报告模型就绪（`compatibility.py`），共 48 个测试，再加上一个真实的、可安装的 Python 包，带有已验证的入口点，以及一个已接入构建流程的里程表式版本递增机制。具体已捕获的构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
+**今天已实现的内容：** 模型注册表——模式校验（包括必须提供且经过校验的 Hailo 架构元数据）、重复版本检测、最新版本查找、以及 sha256 完整性校验（`registry.py`）——加上一个真实的、组合式的安全加载关卡，会一起检查架构兼容性和校验和完整性，只有两者都通过时才会报告模型就绪（`compatibility.py`），同样的检查也作为一个真实的、长期运行的 JSON/HTTP API（`api.py`，`serve` 子命令）与一次性 CLI 并行暴露，共 48 个测试，再加上一个真实的、可安装的 Python 包，带有已验证的入口点，以及一个已接入构建流程的里程表式版本递增机制。具体已捕获的构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 **仍待完成、顺序不分先后、无既定时间表、且受限于真实 Hailo 硬件的内容：**
 

@@ -6,31 +6,39 @@
 toolchain: parsing, validating, and checksumming a JSON registry of
 compiled `.hef` models, plus a real, combined safe-load gate that checks
 Hailo-architecture compatibility and checksum integrity together before
-ever reporting a model ready to deploy. ONNX export and Hailo Dataflow
-Compiler quantization need real Hailo hardware/SDK and are not built
-yet. Every example below was captured from a real run of the installed
-CLI, against a real registry JSON file and real `.hef`-shaped fixture
-files (with real sha256 digests) — not written from memory.
+ever reporting a model ready to deploy — reachable both as one-shot
+`registry` CLI subcommands and, via `serve`, as a long-running JSON/HTTP
+API (`api.py`) exposing the same checks over `GET /registry`,
+`GET /registry/latest`, `GET /registry/load`, and `GET /stats`. ONNX
+export and Hailo Dataflow Compiler quantization need real Hailo
+hardware/SDK and are not built yet. Every example below was captured
+from a real run of the installed CLI, against a real registry JSON file
+and real `.hef`-shaped fixture files (with real sha256 digests) — not
+written from memory.
 
 ## Usage
 
 ```
 $ hydra-umc-detection-hef -h
-usage: hydra-umc-detection-hef [-h] {registry} ...
+usage: hydra-umc-detection-hef [-h] {registry,serve} ...
 
 positional arguments:
-  {registry}
-    registry  Inspect the compiled-model registry.
+  {registry,serve}
+    registry        Inspect the compiled-model registry.
+    serve           Run the registry validate/latest/load queries as a
+                    JSON/HTTP API (GET /registry, GET /registry/latest, GET
+                    /registry/load) - registry and models directory are
+                    configured once at startup, not per-request.
 
 options:
-  -h, --help  show this help message and exit
+  -h, --help        show this help message and exit
 ```
 
 Bare invocation (no subcommand) prints identity/version/role and exits `0`:
 
 ```
 $ hydra-umc-detection-hef
-HYDRA-UMC-DETECTION-HEF v0.0.4
+HYDRA-UMC-DETECTION-HEF v0.0.6
 Library of hardware-accelerated YOLO detection models compiled to Hailo Executable Format (HEF) for industrial inspection.
 ```
 
@@ -262,12 +270,88 @@ $ echo $?
 1
 ```
 
+### `serve --registry PATH [--models-dir PATH] [--addr ADDR] [--port PORT]`
+
+Runs the same `registry.py`/`compatibility.py` logic the three `registry`
+subcommands above use, but as a long-running JSON/HTTP API
+(`src/hydra_umc_detection_hef/api.py`, stdlib `http.server`) instead of a
+one-shot CLI call. Unlike the CLI, `--registry`/`--models-dir` are
+configured once at startup, not per-request — a real deployed registry
+server has one registry to serve. `--addr`/`--port` default to
+`127.0.0.1:8093`. The registry file is re-read from disk on every request
+(no cache to go stale).
+
+Real startup output, then serves until `Ctrl-C`:
+
+```
+$ hydra-umc-detection-hef serve --registry registry.json --models-dir models --port 8093
+[detection-hef] HTTP API listening on 127.0.0.1:8093 (registry=registry.json)
+[detection-hef] GET /registry, GET /registry/latest, GET /registry/load, GET /stats
+```
+
+`GET /registry` — the full registry plus any duplicate `(name, version)`
+pairs, real output against the demo registry above:
+
+```
+$ curl -s http://127.0.0.1:8093/registry
+{"entries": [{"name": "pcb-defect", "version": "0.1.0", "task": "detection", "input_shape": [640, 640, 3], "classes": ["solder_bridge", "missing_component"], "hef_path": "pcb-defect-0.1.0.hef", "sha256": "dce3f284863b41be924a512ae172fdaf91737c45158be164a05e1f7a299fbf9d", "hailo_arch": "hailo8"}], "duplicateVersions": []}
+```
+
+`GET /registry/latest?name=NAME[&task=TASK]` — same lookup as
+`registry latest`, JSON-shaped, real `404` for no match:
+
+```
+$ curl -s http://127.0.0.1:8093/registry/latest?name=pcb-defect
+{"name": "pcb-defect", "version": "0.1.0", "task": "detection", "input_shape": [640, 640, 3], "classes": ["solder_bridge", "missing_component"], "hef_path": "pcb-defect-0.1.0.hef", "sha256": "dce3f284863b41be924a512ae172fdaf91737c45158be164a05e1f7a299fbf9d", "hailo_arch": "hailo8"}
+
+$ curl -s -w '\nHTTP:%{http_code}\n' "http://127.0.0.1:8093/registry/latest?name=nonexistent"
+{"error": "no model named 'nonexistent'"}
+HTTP:404
+```
+
+`GET /registry/load?name=NAME&target_arch=ARCH[&task=TASK]` — the same
+combined safe-load gate as `registry load`; real `503` if the server was
+started without `--models-dir`:
+
+```
+$ curl -s http://127.0.0.1:8093/registry/load?name=pcb-defect&target_arch=hailo8
+{"outcome": "ready", "isReady": true, "detail": "pcb-defect 0.1.0 (hailo8) verified and ready", "entry": {"name": "pcb-defect", "version": "0.1.0", "task": "detection", "input_shape": [640, 640, 3], "classes": ["solder_bridge", "missing_component"], "hef_path": "pcb-defect-0.1.0.hef", "sha256": "dce3f284863b41be924a512ae172fdaf91737c45158be164a05e1f7a299fbf9d", "hailo_arch": "hailo8"}}
+```
+
+`GET /stats` — which registry/models-dir this server instance is
+configured with:
+
+```
+$ curl -s http://127.0.0.1:8093/stats
+{"registry": "registry.json", "modelsDir": "models"}
+```
+
+A missing required query parameter is a real `400`, not a crash:
+
+```
+$ curl -s -w '\nHTTP:%{http_code}\n' http://127.0.0.1:8093/registry/latest
+{"error": "missing required param: name"}
+HTTP:400
+```
+
+Any other path is a real `404`:
+
+```
+$ curl -s -w '\nHTTP:%{http_code}\n' http://127.0.0.1:8093/nope
+{"error": "not found"}
+HTTP:404
+```
+
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
-| `0` | `registry validate` (structure OK, and every locally-present file's checksum matched, if `--models-dir` given); `registry latest` (a match was found); `registry load` (real `READY` outcome) |
+| `0` | `registry validate` (structure OK, and every locally-present file's checksum matched, if `--models-dir` given); `registry latest` (a match was found); `registry load` (real `READY` outcome); `serve` (clean shutdown via `Ctrl-C`) |
 | `1` | any real validation failure (malformed registry, duplicate entry, checksum mismatch), no matching model for `latest`, or any real `REJECTED_*` outcome from `load` |
+
+`serve` itself never exits with `1` for a bad request — a malformed query
+or unknown route is a real HTTP error status (`400`/`404`/`502`/`503`),
+not a process exit; the process itself only stops on `Ctrl-C`.
 
 ## Not yet implemented
 
