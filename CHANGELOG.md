@@ -16,6 +16,20 @@ hand.
   array fields. Malformed metadata cannot reach path/version handling through
   implicit Python coercion or a raw `TypeError`.
 
+## [0.0.7]
+
+- **New real `Dockerfile`**, closing the real gap HYDRA-UMC-VISION-NODE's
+  own `docker-compose.yml` named ("still skeleton-stage... no Dockerfile
+  of their own"). Same `--addr`/`--port`/`--registry`/`--models-dir` CLI
+  the real CM5 systemd unit (`systemd/hydra-umc-detection-hef.service`)
+  already runs, bound to `0.0.0.0` instead of `127.0.0.1` (the container's
+  own network namespace is the real isolation boundary here, not the
+  loopback bind), non-root. Starts against a real, valid, empty registry
+  (`[]`) - the same safely-servable default the systemd unit's own header
+  comment documents. Not build-tested (no Docker runtime on this dev
+  machine) - every path/flag matches the one already verified live on the
+  real CM5.
+
 ## [0.0.6] - Real v0: JSON/HTTP server mode, plus CM5 deployment
 
 - **`api.py`** (new) - `GET /registry`, `GET /registry/latest`, and
