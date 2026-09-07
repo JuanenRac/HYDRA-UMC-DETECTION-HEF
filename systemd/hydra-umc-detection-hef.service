@@ -1,0 +1,37 @@
+# =============================================================================
+# HYDRA-UMC-DETECTION-HEF - Local CM5 model registry API systemd unit
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+# =============================================================================
+# --registry points OUTSIDE the shared /etc/hydra-umc/ tree (0750 root:
+# hydra-umc-agent) - same real permission lesson learned installing
+# HYDRA-UMC-NODE-HEALING: this service's own unprivileged account cannot
+# traverse into that directory to open a config file itself. Starts
+# against a real, valid, empty registry ([]) - unlike Node-Healing's own
+# watchdog, an empty registry here is a real, safely-servable state
+# (GET /registry returns zero entries, not a startup crash), so this
+# service is safe to enable/start immediately, with no real .hef models
+# registered yet.
+[Unit]
+Description=HYDRA-UMC-DETECTION-HEF real compiled-model registry API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hydra-umc-detection-hef
+Group=hydra-umc-detection-hef
+WorkingDirectory=/opt/hydra-umc/detection-hef
+Environment=PYTHONPATH=/opt/hydra-umc/detection-hef/src
+ExecStart=/usr/bin/python3 -m hydra_umc_detection_hef.main serve --addr 127.0.0.1 --port 8093 --registry /etc/hydra-umc-detection-hef/registry.json --models-dir /opt/hydra-umc/detection-hef/models
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
