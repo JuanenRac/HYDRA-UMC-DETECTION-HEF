@@ -157,7 +157,7 @@ def add_entry(
     hailo_arch: str,
 ) -> ModelEntry:
     """Build and validate a new real entry from a real local `.hef` file -
-    found in an ecosystem-wide software-improvements audit: today the
+    found while auditing the code: today the
     registry JSON is hand-edited, including the sha256 that
     `verify_checksum()` only ever checks, never generates - a real risk
     of a corrupted-by-hand registry (a typo'd hex digit never fails until
