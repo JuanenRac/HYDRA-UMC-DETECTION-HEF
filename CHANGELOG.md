@@ -13,8 +13,8 @@ hand.
 ## Unreleased - strict registry entry types
 
 - **New `registry add` subcommand** (`add_entry()`/`write_registry()`/
-  `load_registry_or_empty()` in `registry.py`) - found in an
-  ecosystem-wide software-improvements audit: the registry JSON was
+  `load_registry_or_empty()` in `registry.py`) - found while auditing
+  the code: the registry JSON was
   hand-edited, including the `sha256` that `verify_checksum()` only ever
   checked, never generated - a real risk of a corrupted-by-hand registry
   (a typo'd hex digit never failed until someone ran `registry validate`
@@ -78,7 +78,7 @@ hand.
 
 ## [0.0.5] - Fix: registry `hef_path` path-traversal escape from `models_dir`
 
-- **`registry.py`** - found in a live ecosystem bug audit: `_parse_entry()` only checked `hef_path` for being non-empty, and `verify_checksum()` joined it onto `models_dir` and read/hashed the result without ever confirming the join stayed inside `models_dir`. A registry entry with `hef_path` set to a traversal sequence (e.g. `../../../../etc/passwd`) or an absolute path could make `verify_checksum()`/`safe_load()` checksum an arbitrary local file outside the registry's own models directory. `_parse_entry()` now rejects an absolute `hef_path` outright; `verify_checksum()` resolves the joined path and `models_dir` and requires the former to actually be `models_dir` or a real descendant of it (`Path.is_relative_to()` on the resolved paths, not a `str.startswith()` prefix check, which a sibling directory like `models_dir_evil` would falsely pass) before ever touching the filesystem, raising `RegistryError` on an escape attempt the same way the rest of entry validation does.
+- **`registry.py`** - found while auditing the code: `_parse_entry()` only checked `hef_path` for being non-empty, and `verify_checksum()` joined it onto `models_dir` and read/hashed the result without ever confirming the join stayed inside `models_dir`. A registry entry with `hef_path` set to a traversal sequence (e.g. `../../../../etc/passwd`) or an absolute path could make `verify_checksum()`/`safe_load()` checksum an arbitrary local file outside the registry's own models directory. `_parse_entry()` now rejects an absolute `hef_path` outright; `verify_checksum()` resolves the joined path and `models_dir` and requires the former to actually be `models_dir` or a real descendant of it (`Path.is_relative_to()` on the resolved paths, not a `str.startswith()` prefix check, which a sibling directory like `models_dir_evil` would falsely pass) before ever touching the filesystem, raising `RegistryError` on an escape attempt the same way the rest of entry validation does.
 - 4 new tests: an absolute `hef_path` is rejected at `load_registry()` time; a relative traversal `hef_path` (`../../../../outside.hef`) is rejected by `verify_checksum()`; a traversal into a sibling directory whose name merely starts with `models_dir`'s name is rejected too, proving the fix isn't a naive prefix check; a legitimate relative `hef_path` in a subdirectory still verifies correctly. Full suite (36 tests) passes.
 
 ## [0.0.4] - Real safe-load gate: Hailo-architecture compatibility + checksum
