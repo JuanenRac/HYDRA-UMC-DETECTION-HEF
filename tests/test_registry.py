@@ -240,7 +240,7 @@ def test_verify_checksum_allows_legitimate_relative_subdirectory(tmp_path):
 # ---------------------------------------------------------------------------
 # add_entry() / write_registry() / load_registry_or_empty()
 # ---------------------------------------------------------------------------
-# Found in an ecosystem-wide software-improvements audit: today the
+# Found while auditing the code: today the
 # registry JSON is hand-edited, including the sha256 that
 # verify_checksum() only ever checks, never generates.
 
