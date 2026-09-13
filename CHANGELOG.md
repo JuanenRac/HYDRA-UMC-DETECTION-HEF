@@ -10,8 +10,31 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
-## Unreleased - strict registry entry types
+## Unreleased
 
+(nothing yet)
+
+## [0.0.8] - H011/H012/H013: boolean dimensions, an untranslated path rejection, and strict registry entry types
+
+- **H011:** `_parse_entry()`'s `input_shape` check used `isinstance(d, int)`
+  to validate each dimension - bool is a subclass of int in Python, so
+  `isinstance(True, int)` is `True` and `True <= 0` is `False` (`True ==
+  1`), letting a dimension of `True` sail through as a "valid positive
+  integer" instead of being rejected. Fixed: `isinstance(d, bool)` is now
+  checked and rejected first.
+- **H012:** `verify_checksum()` (reached through `safe_load()`) raises
+  `RegistryError` when a registry entry's own `hef_path` resolves outside
+  `models_dir` - a real, deliberate defense against a corrupt/tampered
+  registry (`_parse_entry` only rejects an absolute `hef_path`; a relative
+  one can still climb out with enough `../` segments). Uncaught in
+  `api.py`'s `_handle_load()`, this propagated straight out of the HTTP
+  handler as an unhandled exception instead of the same controlled 502
+  every other registry-integrity failure in this file already gets.
+  Fixed: wrapped in the same try/except pattern `_load_registry()` uses.
+- **H013:** the worked `registry add` example (with its real command line
+  and captured output) existed only in the English README - the other 6
+  translations mentioned the subcommand in passing but never showed how to
+  actually use it. Added the same example, translated, to all 6.
 - **New `registry add` subcommand** (`add_entry()`/`write_registry()`/
   `load_registry_or_empty()` in `registry.py`) - found while auditing
   the code: the registry JSON was

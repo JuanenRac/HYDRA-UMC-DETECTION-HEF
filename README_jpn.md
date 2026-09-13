@@ -184,6 +184,15 @@ HYDRA-UMC-DETECTION-HEF/
 # REJECTED_ARCH_MISMATCH: model compiled for 'hailo8', this deployment targets 'hailo15h'
 ```
 
+新しいモデルを追加するのに、もう JSON を手で編集する必要はありません(`verify_checksum()` が検証するだけで生成することのない sha256 を含めて)—— `registry add` は実際のローカル `.hef` ファイルをハッシュ化し、検証済みのエントリを追加します:
+
+```bash
+./run.sh registry add --registry registry.json --models-dir models/ --hef-path pcb-defect-0.3.0.hef \
+  --name pcb-defect --version 0.3.0 --task detection --input-shape 640,640,3 \
+  --classes solder_bridge,missing_component --hailo-arch hailo8
+# added pcb-defect 0.3.0 to registry.json (sha256=<実際に計算されたダイジェスト>)
+```
+
 同じレジストリ/安全なロードのチェックは、`./run.sh serve --registry registry.json --models-dir models/`（デフォルト `127.0.0.1:8093`）を通じて、長時間稼働する JSON/HTTP API としても利用できます。すべてのコマンドとエンドポイントの完全なリファレンス（各例は実際の実行から取得）については [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) を参照してください。
 
 ```bat

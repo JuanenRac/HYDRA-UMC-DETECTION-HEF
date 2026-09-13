@@ -73,7 +73,12 @@ def _parse_entry(raw: object, index: int) -> ModelEntry:
     if not isinstance(raw["input_shape"], list):
         raise RegistryError(f"entry {index}: input_shape must be an array")
     input_shape = tuple(raw["input_shape"])
-    if not input_shape or any(not isinstance(d, int) or d <= 0 for d in input_shape):
+    # H011: bool is a subclass of int in Python, so `isinstance(True, int)`
+    # is True and `True <= 0` is False (True == 1) - a dimension of
+    # `True` used to sail through this check as a "valid positive
+    # integer" instead of being rejected as the non-numeric value it
+    # actually is.
+    if not input_shape or any(isinstance(d, bool) or not isinstance(d, int) or d <= 0 for d in input_shape):
         raise RegistryError(f"entry {index}: input_shape must be non-empty positive integers")
 
     if not isinstance(raw["classes"], list):
