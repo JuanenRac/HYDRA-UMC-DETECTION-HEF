@@ -60,6 +60,19 @@ def test_load_registry_bad_sha256(tmp_path):
         load_registry(reg_path)
 
 
+# H011 regression: bool is a subclass of int in Python, so
+# isinstance(True, int) is True and True <= 0 is False (True == 1) - a
+# dimension of `True` used to sail through this check as a "valid
+# positive integer" instead of being rejected.
+def test_load_registry_rejects_a_boolean_input_shape_dimension(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    bad = _entry()
+    bad["input_shape"] = [True, 640, 3]
+    _write_registry(reg_path, [bad])
+    with pytest.raises(RegistryError, match="input_shape"):
+        load_registry(reg_path)
+
+
 def test_load_registry_unknown_hailo_arch(tmp_path):
     reg_path = tmp_path / "registry.json"
     _write_registry(reg_path, [_entry(hailo_arch="hailo9-doesnt-exist")])

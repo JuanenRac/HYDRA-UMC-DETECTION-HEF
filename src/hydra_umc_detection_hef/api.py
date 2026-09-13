@@ -126,7 +126,19 @@ class Handler(BaseHTTPRequestHandler):
         if entry is None:
             _write_error(self, 404, f"no model named {params['name']!r}")
             return
-        result = safe_load(entry, self.server.models_dir, params["target_arch"])
+        # H012: verify_checksum() (reached through safe_load()) raises
+        # RegistryError when a registry entry's own hef_path resolves
+        # outside models_dir - a real, deliberate defense against a
+        # corrupt/tampered registry, not a client input error. Uncaught
+        # here, it used to propagate straight out of this handler as an
+        # unhandled exception instead of the same controlled error every
+        # other registry-integrity failure in this file already gets
+        # (_load_registry()'s own 502, right above).
+        try:
+            result = safe_load(entry, self.server.models_dir, params["target_arch"])
+        except RegistryError as e:
+            _write_error(self, 502, f"could not safe-load model: {e}")
+            return
         _write_json(self, 200, {
             "outcome": result.outcome.value,
             "isReady": result.is_ready,

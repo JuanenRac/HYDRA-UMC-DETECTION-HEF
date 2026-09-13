@@ -129,6 +129,29 @@ def test_registry_load_rejects_arch_mismatch(tmp_path) -> None:
         assert body["isReady"] is False
 
 
+def test_registry_load_translates_a_path_escaping_hef_path_into_a_controlled_error(tmp_path) -> None:
+    # H012: verify_checksum() (reached through safe_load()) raises
+    # RegistryError when a registry entry's own hef_path resolves
+    # outside models_dir - a real defense against a corrupt/tampered
+    # registry (_parse_entry only rejects an ABSOLUTE hef_path; a
+    # relative one can still climb out with enough ../ segments).
+    # Uncaught here, this used to propagate straight out of the handler
+    # instead of the same controlled 502 every other registry-integrity
+    # failure in this file already gets.
+    reg_path = tmp_path / "registry.json"
+    entry = _entry()
+    entry["hef_path"] = "../escaped.hef"
+    _write_registry(reg_path, [entry])
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    (tmp_path / "escaped.hef").write_bytes(b"outside models_dir")
+
+    with running_server(reg_path, models_dir) as base:
+        status, body = _get(f"{base}/registry/load?name=pcb-defect&target_arch=hailo8")
+        assert status == 502
+        assert "error" in body
+
+
 def test_registry_load_without_models_dir_returns_503(tmp_path) -> None:
     reg_path = tmp_path / "registry.json"
     _write_registry(reg_path, [_entry()])
