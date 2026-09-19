@@ -14,15 +14,15 @@ hand.
 
 (nothing yet)
 
-## [0.0.8] - H011/H012/H013: boolean dimensions, an untranslated path rejection, and strict registry entry types
+## [0.0.8] - boolean dimensions, an untranslated path rejection, and strict registry entry types
 
-- **H011:** `_parse_entry()`'s `input_shape` check used `isinstance(d, int)`
+- `_parse_entry()`'s `input_shape` check used `isinstance(d, int)`
   to validate each dimension - bool is a subclass of int in Python, so
   `isinstance(True, int)` is `True` and `True <= 0` is `False` (`True ==
   1`), letting a dimension of `True` sail through as a "valid positive
   integer" instead of being rejected. Fixed: `isinstance(d, bool)` is now
   checked and rejected first.
-- **H012:** `verify_checksum()` (reached through `safe_load()`) raises
+- `verify_checksum()` (reached through `safe_load()`) raises
   `RegistryError` when a registry entry's own `hef_path` resolves outside
   `models_dir` - a real, deliberate defense against a corrupt/tampered
   registry (`_parse_entry` only rejects an absolute `hef_path`; a relative
@@ -31,7 +31,7 @@ hand.
   handler as an unhandled exception instead of the same controlled 502
   every other registry-integrity failure in this file already gets.
   Fixed: wrapped in the same try/except pattern `_load_registry()` uses.
-- **H013:** the worked `registry add` example (with its real command line
+- the worked `registry add` example (with its real command line
   and captured output) existed only in the English README - the other 6
   translations mentioned the subcommand in passing but never showed how to
   actually use it. Added the same example, translated, to all 6.
