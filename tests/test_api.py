@@ -130,7 +130,7 @@ def test_registry_load_rejects_arch_mismatch(tmp_path) -> None:
 
 
 def test_registry_load_translates_a_path_escaping_hef_path_into_a_controlled_error(tmp_path) -> None:
-    # H012: verify_checksum() (reached through safe_load()) raises
+    # verify_checksum (reached through safe_load) raises
     # RegistryError when a registry entry's own hef_path resolves
     # outside models_dir - a real defense against a corrupt/tampered
     # registry (_parse_entry only rejects an ABSOLUTE hef_path; a

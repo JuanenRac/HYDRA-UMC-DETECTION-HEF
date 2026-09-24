@@ -60,7 +60,7 @@ def test_load_registry_bad_sha256(tmp_path):
         load_registry(reg_path)
 
 
-# H011 regression: bool is a subclass of int in Python, so
+# regression: bool is a subclass of int in Python, so
 # isinstance(True, int) is True and True <= 0 is False (True == 1) - a
 # dimension of `True` used to sail through this check as a "valid
 # positive integer" instead of being rejected.

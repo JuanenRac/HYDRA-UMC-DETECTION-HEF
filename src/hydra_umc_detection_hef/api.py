@@ -126,7 +126,7 @@ class Handler(BaseHTTPRequestHandler):
         if entry is None:
             _write_error(self, 404, f"no model named {params['name']!r}")
             return
-        # H012: verify_checksum() (reached through safe_load()) raises
+        # verify_checksum (reached through safe_load) raises
         # RegistryError when a registry entry's own hef_path resolves
         # outside models_dir - a real, deliberate defense against a
         # corrupt/tampered registry, not a client input error. Uncaught
