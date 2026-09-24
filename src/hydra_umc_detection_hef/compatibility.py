@@ -95,3 +95,19 @@ def safe_load(entry: ModelEntry, models_dir: Path, target_arch: str) -> LoadResu
         entry=entry,
         detail=f"{entry.name} {entry.version} ({entry.hailo_arch}) verified and ready",
     )
+
+
+def model_identity(entry: ModelEntry) -> dict[str, str]:
+    """The model facts a consumer records next to results it produced with it.
+
+    The keys match the compatibility record HYDRA-UMC-VISION-NODE reads
+    (`model_name`, `model_version`, `model_sha256`, `hailo_arch`), so a
+    loaded model's identity can be attached to its detections as is. The
+    pipeline version is the consumer's own to add.
+    """
+    return {
+        "model_name": entry.name,
+        "model_version": entry.version,
+        "model_sha256": entry.sha256.lower(),
+        "hailo_arch": entry.hailo_arch,
+    }

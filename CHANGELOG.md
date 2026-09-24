@@ -14,6 +14,10 @@ hand.
 
 (nothing yet)
 
+## [0.0.9] - Model identity
+
+- Added model_identity(), which returns a registry entry's name, version, SHA-256 and Hailo architecture under the field names the vision node's compatibility record uses, so a loaded model's identity can be attached to its detections.
+
 ## [0.0.8] - boolean dimensions, an untranslated path rejection, and strict registry entry types
 
 - `_parse_entry()`'s `input_shape` check used `isinstance(d, int)`

@@ -1,7 +1,7 @@
 import hashlib
 import json
 
-from hydra_umc_detection_hef.compatibility import LoadOutcome, check_arch_compatibility, safe_load
+from hydra_umc_detection_hef.compatibility import LoadOutcome, check_arch_compatibility, model_identity, safe_load
 from hydra_umc_detection_hef.registry import load_registry
 
 
@@ -105,3 +105,16 @@ def test_safe_load_never_reports_ready_for_a_tampered_file_even_on_the_right_arc
 
     assert result.outcome is LoadOutcome.REJECTED_CHECKSUM_MISMATCH
     assert not result.is_ready
+
+
+def test_model_identity_names_the_facts_a_consumer_records_with_its_results(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    _write_registry(reg_path, [_entry(sha256="AB" * 32, hailo_arch="hailo8")])
+    entry = load_registry(reg_path)[0]
+
+    assert model_identity(entry) == {
+        "model_name": "pcb-defect",
+        "model_version": "0.1.0",
+        "model_sha256": "ab" * 32,
+        "hailo_arch": "hailo8",
+    }
