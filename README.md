@@ -9,7 +9,7 @@
 ### 📦 Hardware-Accelerated Industrial Model Library (Hailo-8 / Hailo-10)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Licencia-GPL%203.0-blue.svg" alt="GPL 3.0">
+  <img src="https://img.shields.io/badge/License-GPL%203.0-blue.svg" alt="GPL 3.0">
   <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="HEF">
   <img src="https://img.shields.io/badge/Models-YOLOv8%20%2F%20YOLOv10-00A4EF.svg" alt="YOLO">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-green.svg" alt="Functional v0">
