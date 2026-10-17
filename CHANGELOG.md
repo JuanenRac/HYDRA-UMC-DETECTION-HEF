@@ -14,6 +14,13 @@ hand.
 
 (nothing yet)
 
+## [0.1.0] - Durable registry file, idle connections dropped, Portuguese README
+
+- **Durable registry file:** `write_registry()` (used by `registry add`) rewrote the registry in place. The registry is the trust source for every model a deployment loads (names, target architecture, sha256), so a power cut or a full disk halfway through left a truncated file and no registry at all. The new content is now written beside it, flushed and fsynced, then renamed over it, so the previous registry stays intact until the new one is complete; a failed write removes its temporary file.
+- **Idle connections are dropped:** the HTTP handler had no connection timeout, so a client that opened a connection and sent nothing held a handler thread forever. A silent client is now dropped after 15 seconds; the limit covers socket I/O only.
+- **Tests:** new tests cover the atomic write (round trip with no temporary file left, a write that fails midway keeps the previous registry) and the dropped idle connection (62 tests).
+- **Docs:** the README test counts are corrected, it documents the atomic registry write, and a README in Portuguese (`README_por.md`) joins the other translations.
+
 ## [0.0.9] - Model identity
 
 - Added model_identity(), which returns a registry entry's name, version, SHA-256 and Hailo architecture under the field names the vision node's compatibility record uses, so a loaded model's identity can be attached to its detections.

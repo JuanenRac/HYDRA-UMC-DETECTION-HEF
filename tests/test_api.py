@@ -183,3 +183,26 @@ def test_malformed_registry_returns_502(tmp_path) -> None:
     with running_server(reg_path) as base:
         status, body = _get(f"{base}/registry")
         assert status == 502
+
+
+def test_a_client_that_sends_nothing_is_dropped_instead_of_holding_a_thread(tmp_path, monkeypatch):
+    import socket
+    import time
+
+    from hydra_umc_detection_hef.api import Handler
+
+    monkeypatch.setattr(Handler, "timeout", 0.3)
+    reg_path = tmp_path / "registry.json"
+    _write_registry(reg_path, [])
+    server = RegistryServer(("127.0.0.1", 0), reg_path, None)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with socket.create_connection(("127.0.0.1", server.server_address[1]), timeout=5) as client:
+            started = time.monotonic()
+            assert client.recv(1) == b""  # sends nothing; the server closes the connection by itself
+            assert time.monotonic() - started < 3
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

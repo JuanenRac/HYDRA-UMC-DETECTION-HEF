@@ -392,3 +392,39 @@ def test_write_registry_round_trips_through_load_registry(tmp_path):
 
     reloaded = load_registry(reg_path)
     assert reloaded == [entry]
+
+
+def _entry_objects(tmp_path, version):
+    reg = tmp_path / "source.json"
+    _write_registry(reg, [_entry(version=version)])
+    return load_registry(reg)
+
+
+def test_write_registry_round_trips_and_leaves_no_temporary_file(tmp_path):
+    path = tmp_path / "registry.json"
+    write_registry(path, _entry_objects(tmp_path, "0.1.0"))
+    assert [e.version for e in load_registry(path)] == ["0.1.0"]
+    assert sorted(p.name for p in tmp_path.iterdir() if p.name != "source.json") == ["registry.json"]
+
+
+def test_a_write_that_fails_midway_keeps_the_previous_registry(tmp_path, monkeypatch):
+    # the registry is the trust source for every model a deployment loads: a power cut or a
+    # full disk while it is rewritten used to leave a truncated file and no registry at all
+    import os
+
+    path = tmp_path / "registry.json"
+    write_registry(path, _entry_objects(tmp_path, "0.1.0"))
+    before = path.read_bytes()
+    new_entries = _entry_objects(tmp_path, "0.2.0")
+
+    def interrupted(descriptor):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(os, "fsync", interrupted)
+    with pytest.raises(OSError):
+        write_registry(path, new_entries)
+    monkeypatch.undo()
+
+    assert path.read_bytes() == before
+    assert [e.version for e in load_registry(path)] == ["0.1.0"]
+    assert sorted(p.name for p in tmp_path.iterdir() if p.name != "source.json") == ["registry.json"]

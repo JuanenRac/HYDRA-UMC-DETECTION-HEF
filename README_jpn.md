@@ -4,7 +4,7 @@
 
 # 🎯 HYDRA-UMC-DETECTION-HEF
 
-<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | 🇯🇵 <b>日本語</b></p>
+<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | 🇯🇵 <b>日本語</b> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### 📦 ハードウェアアクセラレーション産業用モデルライブラリ（Hailo-8 / Hailo-10）
 
@@ -38,7 +38,7 @@
 * 🤖 **姿勢推定（計画中）：** ロボットアームの関節追跡のためのキーポイント検出。*（同じ理由で将来の作業です。）*
 * 🧩 **独立したプロジェクトとして存在する理由：** モデルのコンパイルとバージョン管理はデータ/ML ワークフローであり、それらを提供するランタイムプロセスとは完全に異なります——ツールチェーンをここに保つことで、不良なコンパイルが実行中の知覚ノードを危険にさらすことは決してなく、モデルは [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE) に到達する前にオフラインで反復・検証できます。
 
-**正直な現状確認 —— 今日実際に動くもの：** 本プロジェクトの仕事のうち、実際にハードウェアに依存しない半分——モデルレジストリ（`registry.py`）と実際の安全なロードのゲート（`compatibility.py`）——は、`registry validate`/`registry latest`/`registry load`、および長時間稼働する JSON/HTTP API としての `serve`（`api.py`）を通じて公開され、実装され、テストされています（59 個のテスト）。このレジストリが記述するモデルを実際に*生成*する ONNX エクスポート、Hailo Dataflow Compiler による量子化、HAR/HEF パッケージングは、依然として将来の作業です：いずれもこの環境にはない実際の Hailo ハードウェアを必要とします。
+**正直な現状確認 —— 今日実際に動くもの：** 本プロジェクトの仕事のうち、実際にハードウェアに依存しない半分——モデルレジストリ（`registry.py`）と実際の安全なロードのゲート（`compatibility.py`）——は、`registry validate`/`registry latest`/`registry load`、および長時間稼働する JSON/HTTP API としての `serve`（`api.py`）を通じて公開され、実装され、テストされています（62 個のテスト）。このレジストリが記述するモデルを実際に*生成*する ONNX エクスポート、Hailo Dataflow Compiler による量子化、HAR/HEF パッケージングは、依然として将来の作業です：いずれもこの環境にはない実際の Hailo ハードウェアを必要とします。
 実際に出荷済みの内容は [`CHANGELOG.md`](CHANGELOG.md) を、まだ残っている
 作業は下記の「現在の状況と次のステップ」セクションを参照してください。
 
@@ -141,7 +141,7 @@ HYDRA-UMC-DETECTION-HEF/
 2. **仮想環境** — `.venv/` が存在しない場合は作成し、存在する場合は再利用します。
 3. **Editable インストール** — `pip install -e ".[dev]"` により `src/` 下の変更が即座に反映され、`pytest` がインストールされ、`hydra-umc-detection-hef` コンソールエントリポイントが登録されます。
 4. **コンパイルチェック** — `python -m compileall -q src` が `src/` 下の各ファイルをバイトコンパイルし、エコシステム全体にわたる構文エラーを検出します。
-5. **実際のテストスイート** — `python -m pytest tests/ -q`（レジストリ、安全なロードのゲート、CLI をカバーする 59 個のテスト）。
+5. **実際のテストスイート** — `python -m pytest tests/ -q`（レジストリ、安全なロードのゲート、CLI をカバーする 62 個のテスト）。
 
 `set -euo pipefail` は最初に失敗したステップでスクリプトを停止させます。
 5 つのステップすべてが成功した場合にのみビルドは成功を報告します。
@@ -193,6 +193,8 @@ HYDRA-UMC-DETECTION-HEF/
 # added pcb-defect 0.3.0 to registry.json (sha256=<実際に計算されたダイジェスト>)
 ```
 
+レジストリファイルはアトミックに書き直されます（隣に書き込み、fsync し、その上にリネーム）。そのため、モデルの追加中に停電やディスク満杯が起きても、切り詰められたファイルではなく以前のレジストリがそのまま残ります。
+
 同じレジストリ/安全なロードのチェックは、`./run.sh serve --registry registry.json --models-dir models/`（デフォルト `127.0.0.1:8093`）を通じて、長時間稼働する JSON/HTTP API としても利用できます。すべてのコマンドとエンドポイントの完全なリファレンス（各例は実際の実行から取得）については [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) を参照してください。
 
 ```bat
@@ -212,7 +214,7 @@ run.bat
 
 ## 🚀 現在の状況と次のステップ
 
-**今日実現していること：** モデルレジストリ——スキーマ検証(必須の、検証済みの Hailo アーキテクチャメタデータを含む)、重複バージョンの検出、最新バージョンの検索、sha256 による整合性検証（`registry.py`）——に加え、アーキテクチャ互換性とチェックサムの整合性を一緒にチェックし、両方が通った場合にのみモデルを準備完了として報告する実際の組み合わせ安全ロードゲート（`compatibility.py`）、同じチェックを一回限りの CLI と並んで実際の長時間稼働 JSON/HTTP API（`api.py`、`serve` サブコマンド）としても公開、合計 59 個のテスト、さらに検証済みのエントリポイントを持つ実際のインストール
+**今日実現していること：** モデルレジストリ——スキーマ検証(必須の、検証済みの Hailo アーキテクチャメタデータを含む)、重複バージョンの検出、最新バージョンの検索、sha256 による整合性検証（`registry.py`）——に加え、アーキテクチャ互換性とチェックサムの整合性を一緒にチェックし、両方が通った場合にのみモデルを準備完了として報告する実際の組み合わせ安全ロードゲート（`compatibility.py`）、同じチェックを一回限りの CLI と並んで実際の長時間稼働 JSON/HTTP API（`api.py`、`serve` サブコマンド）としても公開、合計 62 個のテスト、さらに検証済みのエントリポイントを持つ実際のインストール
 可能な Python パッケージ、そしてビルドに組み込まれた
 オドメーター式バージョンインクリメント。実際に取得されたビルド/実行出力については
 [`CHANGELOG.md`](CHANGELOG.md) を参照してください。

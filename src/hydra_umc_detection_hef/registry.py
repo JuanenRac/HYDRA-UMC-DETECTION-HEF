@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -146,7 +147,27 @@ def write_registry(path: Path, entries: list[ModelEntry]) -> None:
     """Write `entries` back as the same JSON-array-of-objects shape
     `load_registry()` reads, one real key order, human-diffable."""
     payload = [_entry_to_json(entry) for entry in entries]
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    text = json.dumps(payload, indent=2) + "\n"
+    # This file is the trust source for every model `safe_load` accepts (names,
+    # architectures, sha256). Rewriting it in place meant a power cut or a full
+    # disk halfway through left a truncated file and the whole registry
+    # unreadable; the new content is now written beside it, flushed and fsynced,
+    # then renamed over it, so the previous registry stays intact until the
+    # new one is complete.
+    path = Path(path)
+    temporary = path.with_name(path.name + ".tmp")
+    try:
+        with open(temporary, "w", encoding="utf-8", newline="") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def add_entry(
