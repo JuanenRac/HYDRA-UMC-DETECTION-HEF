@@ -15,10 +15,13 @@ consumer that picks the right entry off it at deploy time.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
 import re
+import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -87,11 +90,15 @@ def _parse_entry(raw: object, index: int) -> ModelEntry:
     classes = tuple(raw["classes"])
     if not classes or any(not isinstance(label, str) or not label.strip() for label in classes):
         raise RegistryError(f"entry {index}: classes must not be empty")
+    if len(set(classes)) != len(classes):
+        raise RegistryError(f"entry {index}: classes must not repeat a label - class ids are positions in this list")
 
     if not isinstance(raw["hef_path"], str) or not raw["hef_path"].strip():
         raise RegistryError(f"entry {index}: hef_path must not be empty")
     if Path(raw["hef_path"]).is_absolute():
         raise RegistryError(f"entry {index}: hef_path {raw['hef_path']!r} must be a relative path")
+    if ".." in Path(raw["hef_path"]).parts or ".." in raw["hef_path"].replace("\\", "/").split("/"):
+        raise RegistryError(f"entry {index}: hef_path {raw['hef_path']!r} must not contain '..' segments")
     if not isinstance(raw["sha256"], str) or not re.fullmatch(r"[0-9a-fA-F]{64}", raw["sha256"]):
         raise RegistryError(f"entry {index}: sha256 must be a 64-char hex digest")
     if not isinstance(raw["hailo_arch"], str) or raw["hailo_arch"] not in KNOWN_HAILO_ARCHS:
@@ -143,6 +150,44 @@ def _entry_to_json(entry: ModelEntry) -> dict[str, object]:
     }
 
 
+def _fsync_directory(directory: Path) -> None:
+    """Best effort: makes the rename itself survive a power cut (not possible on every OS)."""
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
+@contextlib.contextmanager
+def registry_lock(path: Path, timeout: float = 10.0):
+    """Serialises read-modify-write cycles on one registry file: two
+    `registry add` running together used to overwrite each other's entry."""
+    lock_path = Path(path).with_name(Path(path).name + ".lock")
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            if time.monotonic() > deadline:
+                raise RegistryError(f"{lock_path} is held by another process (remove it if that process is gone)") from None
+            time.sleep(0.05)
+    try:
+        yield
+    finally:
+        os.close(fd)
+        try:
+            lock_path.unlink()
+        except OSError:
+            pass
+
+
 def write_registry(path: Path, entries: list[ModelEntry]) -> None:
     """Write `entries` back as the same JSON-array-of-objects shape
     `load_registry()` reads, one real key order, human-diffable."""
@@ -155,13 +200,16 @@ def write_registry(path: Path, entries: list[ModelEntry]) -> None:
     # then renamed over it, so the previous registry stays intact until the
     # new one is complete.
     path = Path(path)
-    temporary = path.with_name(path.name + ".tmp")
+    # a unique temporary name: two writers must never share one
+    handle_fd, temporary_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+    temporary = Path(temporary_name)
     try:
-        with open(temporary, "w", encoding="utf-8", newline="") as handle:
+        with open(handle_fd, "w", encoding="utf-8", newline="") as handle:
             handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
+        _fsync_directory(path.parent)
     except BaseException:
         try:
             temporary.unlink()
@@ -231,12 +279,33 @@ def duplicate_versions(entries: list[ModelEntry]) -> list[tuple[str, str]]:
     return sorted(key for key, count in seen.items() if count > 1)
 
 
-def find_latest(entries: list[ModelEntry], name: str, task: str | None = None) -> ModelEntry | None:
-    """The highest-version entry matching name (and task, if given)."""
+class AmbiguousModelError(RegistryError):
+    """Two registry entries claim the same name and version but point at different files."""
+
+
+def find_latest(
+    entries: list[ModelEntry], name: str, task: str | None = None, version: str | None = None
+) -> ModelEntry | None:
+    """The highest-version entry matching name (and task, if given), or the
+    entry of exactly `version` when one is asked for (to pin or roll back).
+
+    Raises AmbiguousModelError when the winning name+version appears more than
+    once with a different file or checksum: picking "the first one in the
+    file" would let a bad merge of the registry deploy a different binary
+    while the answer still says it is verified."""
     candidates = [e for e in entries if e.name == name and (task is None or e.task == task)]
+    if version is not None:
+        candidates = [e for e in candidates if e.version == version]
     if not candidates:
         return None
-    return max(candidates, key=lambda e: e.version_tuple)
+    best = max(candidates, key=lambda e: e.version_tuple)
+    rivals = [e for e in candidates if e.version == best.version and (e.hef_path, e.sha256) != (best.hef_path, best.sha256)]
+    if rivals:
+        raise AmbiguousModelError(
+            f"{name!r} {best.version!r} appears more than once with different files "
+            f"({best.hef_path}, {rivals[0].hef_path}) - fix the registry"
+        )
+    return best
 
 
 def compute_sha256(file_path: Path) -> str:

@@ -1,4 +1,5 @@
 import hashlib
+import dataclasses
 import json
 
 import pytest
@@ -26,6 +27,12 @@ def _entry(name="pcb-defect", version="0.1.0", task="detection", sha256="a" * 64
         "input_shape": [640, 640, 3], "classes": ["solder_bridge", "missing_component"],
         "hef_path": f"{name}-{version}.hef", "sha256": sha256, "hailo_arch": hailo_arch,
     }
+
+
+def _parsed_entry(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    _write_registry(reg_path, [_entry()])
+    return load_registry(reg_path)[0]
 
 
 def test_load_registry_valid(tmp_path):
@@ -204,11 +211,9 @@ def test_verify_checksum_rejects_path_traversal(tmp_path):
     outside = tmp_path / "outside.hef"
     outside.write_bytes(b"secret bytes outside models_dir")
 
-    reg_path = tmp_path / "registry.json"
-    bad = _entry()
-    bad["hef_path"] = "../../../../outside.hef"
-    _write_registry(reg_path, [bad])
-    entry = load_registry(reg_path)[0]
+    # the parser already refuses "..", so build the entry by hand to keep
+    # exercising the second line of defence in verify_checksum
+    entry = dataclasses.replace(_parsed_entry(tmp_path), hef_path="../../../../outside.hef")
 
     with pytest.raises(RegistryError):
         verify_checksum(entry, models_dir)
@@ -224,11 +229,7 @@ def test_verify_checksum_rejects_traversal_into_prefix_matching_sibling(tmp_path
     evil_sibling.mkdir()
     (evil_sibling / "secret.hef").write_bytes(b"secret bytes in sibling dir")
 
-    reg_path = tmp_path / "registry.json"
-    bad = _entry()
-    bad["hef_path"] = "../models_evil/secret.hef"
-    _write_registry(reg_path, [bad])
-    entry = load_registry(reg_path)[0]
+    entry = dataclasses.replace(_parsed_entry(tmp_path), hef_path="../models_evil/secret.hef")
 
     with pytest.raises(RegistryError):
         verify_checksum(entry, models_dir)
@@ -428,3 +429,72 @@ def test_a_write_that_fails_midway_keeps_the_previous_registry(tmp_path, monkeyp
     assert path.read_bytes() == before
     assert [e.version for e in load_registry(path)] == ["0.1.0"]
     assert sorted(p.name for p in tmp_path.iterdir() if p.name != "source.json") == ["registry.json"]
+
+
+def test_a_hef_path_with_parent_segments_is_rejected_when_the_registry_is_read(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    bad = _entry()
+    bad["hef_path"] = "../../etc/passwd"
+    _write_registry(reg_path, [bad])
+    with pytest.raises(RegistryError, match="'..'"):
+        load_registry(reg_path)
+
+
+def test_repeated_class_labels_are_rejected(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    bad = _entry()
+    bad["classes"] = ["ok", "ok"]
+    _write_registry(reg_path, [bad])
+    with pytest.raises(RegistryError, match="classes"):
+        load_registry(reg_path)
+
+
+def test_two_entries_for_the_same_version_with_different_files_are_ambiguous(tmp_path):
+    from hydra_umc_detection_hef.registry import AmbiguousModelError
+
+    reg_path = tmp_path / "registry.json"
+    other = _entry()
+    other["hef_path"] = "other.hef"
+    other["sha256"] = "b" * 64
+    _write_registry(reg_path, [_entry(), other])
+    entries = load_registry(reg_path)
+    with pytest.raises(AmbiguousModelError):
+        find_latest(entries, "pcb-defect")
+
+
+def test_a_specific_version_can_be_asked_for(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    _write_registry(reg_path, [_entry(version="0.1.0"), _entry(version="0.2.0")])
+    entries = load_registry(reg_path)
+    assert find_latest(entries, "pcb-defect").version == "0.2.0"
+    assert find_latest(entries, "pcb-defect", version="0.1.0").version == "0.1.0"
+    assert find_latest(entries, "pcb-defect", version="9.9.9") is None
+
+
+def test_concurrent_registry_adds_do_not_lose_entries(tmp_path):
+    import threading
+
+    from hydra_umc_detection_hef.registry import add_entry, load_registry_or_empty, registry_lock
+
+    models = tmp_path / "models"
+    models.mkdir()
+    for i in range(6):
+        (models / f"m{i}.hef").write_bytes(b"model %d" % i)
+    reg_path = tmp_path / "registry.json"
+
+    def add(i):
+        with registry_lock(reg_path):
+            entries = load_registry_or_empty(reg_path)
+            entries.append(add_entry(
+                entries, models_dir=models, name=f"m{i}", version="0.1.0", task="detection",
+                input_shape=(640, 640, 3), classes=("a",), hef_path=f"m{i}.hef", hailo_arch="hailo8",
+            ))
+            write_registry(reg_path, entries)
+
+    threads = [threading.Thread(target=add, args=(i,)) for i in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(e.name for e in load_registry(reg_path)) == [f"m{i}" for i in range(6)]
+    assert not list(tmp_path.glob("*.tmp")) and not list(tmp_path.glob("*.lock"))

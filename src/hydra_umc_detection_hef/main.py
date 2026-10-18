@@ -31,6 +31,7 @@ from .registry import (
     find_latest,
     load_registry,
     load_registry_or_empty,
+    registry_lock,
     verify_checksum,
     write_registry,
 )
@@ -117,12 +118,20 @@ def _cmd_registry_load(args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    entry = find_latest(entries, args.name, args.task)
+    try:
+        entry = find_latest(entries, args.name, args.task, getattr(args, "version", None))
+    except RegistryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
     if entry is None:
         print(f"no model named {args.name!r}" + (f" with task {args.task!r}" if args.task else ""), file=sys.stderr)
         return 1
 
-    result = safe_load(entry, Path(args.models_dir), args.target_arch)
+    try:
+        result = safe_load(entry, Path(args.models_dir), args.target_arch)
+    except RegistryError as exc:
+        print(f"REJECTED: {exc}", file=sys.stderr)
+        return 1
     if result.is_ready:
         print(f"READY: {result.detail}")
         return 0
@@ -133,6 +142,15 @@ def _cmd_registry_load(args: argparse.Namespace) -> int:
 
 def _cmd_registry_add(args: argparse.Namespace) -> int:
     registry_path = Path(args.registry)
+    try:
+        with registry_lock(registry_path):
+            return _registry_add_locked(args, registry_path)
+    except RegistryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+
+def _registry_add_locked(args: argparse.Namespace, registry_path: Path) -> int:
     try:
         entries = load_registry_or_empty(registry_path)
     except RegistryError as exc:
@@ -170,6 +188,11 @@ def _cmd_registry_add(args: argparse.Namespace) -> int:
 
 def _cmd_serve(args: argparse.Namespace) -> int:
     models_dir = Path(args.models_dir) if args.models_dir else None
+    registry_path = Path(args.registry)
+    if registry_path.is_dir():
+        print(f"[detection-hef] warning: {registry_path} is a directory, not a registry file (a bind mount of a missing file does this)", file=sys.stderr)
+    elif not registry_path.is_file():
+        print(f"[detection-hef] warning: registry {registry_path} does not exist - every query will answer 502", file=sys.stderr)
     server = RegistryServer((args.addr, args.port), Path(args.registry), models_dir)
     print(f"[detection-hef] HTTP API listening on {args.addr}:{args.port} (registry={args.registry})")
     print("[detection-hef] GET /registry, GET /registry/latest, GET /registry/load, GET /stats")
@@ -208,6 +231,7 @@ def _build_parser() -> argparse.ArgumentParser:
     load.add_argument("--models-dir", required=True, help="Directory containing the .hef files")
     load.add_argument("--name", required=True, help="Model name to look up")
     load.add_argument("--task", default=None, help="Restrict to this task (e.g. detection, pose)")
+    load.add_argument("--version", default=None, help="Load exactly this version instead of the latest (pin or roll back)")
     load.add_argument(
         "--target-arch", required=True, help="Hailo architecture of this deployment (e.g. hailo8)"
     )

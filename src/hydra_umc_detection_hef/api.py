@@ -22,7 +22,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .compatibility import safe_load
-from .registry import RegistryError, duplicate_versions, find_latest, load_registry
+from .registry import AmbiguousModelError, RegistryError, duplicate_versions, find_latest, load_registry
 
 
 def _write_json(handler: BaseHTTPRequestHandler, status: int, payload: object) -> None:
@@ -110,7 +110,11 @@ class Handler(BaseHTTPRequestHandler):
         entries, handled = self._load_registry()
         if handled:
             return
-        entry = find_latest(entries, params["name"], params.get("task"))
+        try:
+            entry = find_latest(entries, params["name"], params.get("task"), params.get("version"))
+        except AmbiguousModelError as e:
+            _write_error(self, 409, str(e))
+            return
         if entry is None:
             _write_error(self, 404, f"no model named {params['name']!r}")
             return
@@ -127,7 +131,11 @@ class Handler(BaseHTTPRequestHandler):
         entries, handled = self._load_registry()
         if handled:
             return
-        entry = find_latest(entries, params["name"], params.get("task"))
+        try:
+            entry = find_latest(entries, params["name"], params.get("task"), params.get("version"))
+        except AmbiguousModelError as e:
+            _write_error(self, 409, str(e))
+            return
         if entry is None:
             _write_error(self, 404, f"no model named {params['name']!r}")
             return

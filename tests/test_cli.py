@@ -137,3 +137,35 @@ def test_registry_load_rejects_a_real_tampered_file(tmp_path):
     )
     assert result.returncode == 1
     assert "REJECTED_CHECKSUM_MISMATCH" in result.stderr
+
+
+def test_registry_load_with_a_path_outside_the_models_dir_is_a_message_not_a_traceback(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    bad = _entry()
+    bad["hef_path"] = "../../outside.hef"
+    reg_path.write_text(json.dumps([bad]), encoding="utf-8")
+    result = run_cli("registry", "load", "--registry", str(reg_path), "--models-dir", str(tmp_path), "--name", "pcb-defect", "--target-arch", "hailo8")
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    assert "error:" in result.stderr
+
+
+def test_registry_load_refuses_an_ambiguous_version(tmp_path):
+    reg_path = tmp_path / "registry.json"
+    other = _entry(sha256="b" * 64)
+    other["hef_path"] = "other.hef"
+    reg_path.write_text(json.dumps([_entry(), other]), encoding="utf-8")
+    result = run_cli("registry", "load", "--registry", str(reg_path), "--models-dir", str(tmp_path), "--name", "pcb-defect", "--target-arch", "hailo8")
+    assert result.returncode == 1
+    assert "more than once" in result.stderr
+    assert "READY" not in result.stdout
+
+
+def test_registry_load_accepts_the_architecture_as_hailortcli_prints_it(tmp_path):
+    model = tmp_path / "pcb-defect-0.1.0.hef"
+    model.write_bytes(b"model bytes")
+    reg_path = tmp_path / "registry.json"
+    reg_path.write_text(json.dumps([_entry(sha256=hashlib.sha256(b"model bytes").hexdigest())]), encoding="utf-8")
+    result = run_cli("registry", "load", "--registry", str(reg_path), "--models-dir", str(tmp_path), "--name", "pcb-defect", "--target-arch", "HAILO8")
+    assert result.returncode == 0, result.stderr
+    assert "READY" in result.stdout

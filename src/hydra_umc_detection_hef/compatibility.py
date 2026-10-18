@@ -55,7 +55,8 @@ def check_arch_compatibility(entry: ModelEntry, target_arch: str) -> bool:
     validation this environment cannot do. Exact match is the only
     claim honestly verifiable from registry metadata alone.
     """
-    return entry.hailo_arch == target_arch
+    # HailoRT and hailortcli report the device architecture in capitals ("HAILO8")
+    return entry.hailo_arch == target_arch.strip().lower()
 
 
 def safe_load(entry: ModelEntry, models_dir: Path, target_arch: str) -> LoadResult:

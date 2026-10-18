@@ -14,6 +14,16 @@ hand.
 
 (nothing yet)
 
+## [0.1.1] - Ambiguous registries refused, architecture case, version pinning, safer writes
+
+- **Ambiguous registries are refused:** two entries with the same name and version but different files made `registry load` and `GET /registry/load` pick the first one and answer "verified". They now fail (`409` over HTTP) with a message naming both files.
+- **No tracebacks from the CLI:** a `hef_path` that escapes the models folder is rejected when the registry is read (`..` segments are not allowed) and, if one gets through, `registry load` reports `REJECTED` instead of a traceback.
+- **Architecture as the device reports it:** `--target-arch HAILO8` (as `hailortcli` prints it) now matches `hailo8`.
+- **Pin a version:** `registry load --version` and `GET /registry/load?version=` load an exact version instead of the latest, to roll back.
+- **Safer registry writes:** the temporary file has a unique name, the directory is synced after the rename and `registry add` is serialised with a lock file, so concurrent adds no longer lose entries. Repeated class labels are rejected.
+- **Startup warning:** `serve` says when the registry path is missing or is a directory (what a container bind mount of a missing file produces).
+- **Docs:** the README (all languages) explains that compiling a model runs on an x86_64 host with the Dataflow Compiler and a calibration set, not on the accelerator, and where the models live on the board (70 tests).
+
 ## [0.1.0] - Durable registry file, idle connections dropped, Portuguese README
 
 - **Durable registry file:** `write_registry()` (used by `registry add`) rewrote the registry in place. The registry is the trust source for every model a deployment loads (names, target architecture, sha256), so a power cut or a full disk halfway through left a truncated file and no registry at all. The new content is now written beside it, flushed and fsynced, then renamed over it, so the previous registry stays intact until the new one is complete; a failed write removes its temporary file.
