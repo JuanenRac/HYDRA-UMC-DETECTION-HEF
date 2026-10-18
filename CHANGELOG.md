@@ -14,6 +14,11 @@ hand.
 
 (nothing yet)
 
+## [0.1.2]
+
+- Build version synchronized with `hydra-umc.project.json` and the repository-native version source.
+- Every SPDX identifier, file header, the package metadata, the service units and the README licence line now say GPL-3.0-or-later consistently (the LICENSE file keeps the full GPL-3.0 text).
+
 ## [0.1.1] - Ambiguous registries refused, architecture case, version pinning, safer writes
 
 - **Ambiguous registries are refused:** two entries with the same name and version but different files made `registry load` and `GET /registry/load` pick the first one and answer "verified". They now fail (`409` over HTTP) with a message naming both files.

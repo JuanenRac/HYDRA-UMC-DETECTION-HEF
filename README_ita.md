@@ -9,7 +9,7 @@
 ### 📦 Libreria Industriale di Modelli Accelerati via Hardware (Hailo-8 / Hailo-10)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Licenza-GPL%203.0-blue.svg" alt="GPL 3.0">
+  <img src="https://img.shields.io/badge/Licenza-GPL%203.0-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Formato-HEF-FF6F00.svg" alt="HEF">
   <img src="https://img.shields.io/badge/Modelli-YOLOv8%20%2F%20YOLOv10-00A4EF.svg" alt="YOLO">
   <img src="https://img.shields.io/badge/Fase-Funzionale%20v0-green.svg" alt="Funzionale v0">
@@ -309,4 +309,4 @@ Questo progetto fa parte dell'ecosistema robotico HYDRA-UMC dello stesso autore 
 📺 [youtube.com/@electrohobby3d](https://youtube.com/@electrohobby3d)
 
 ## 📜 LICENZA
-GPL-3.0 - Vedi il file LICENSE per i dettagli.
+GPL-3.0-or-later - Vedi il file LICENSE per i dettagli.

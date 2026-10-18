@@ -1,7 +1,7 @@
 # =============================================================================
 # HYDRA-UMC-DETECTION-HEF - package init: src/hydra_umc_detection_hef/__init__.py
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-# GPL-3.0 - see LICENSE
+# GPL-3.0-or-later - see LICENSE
 # =============================================================================
 """HYDRA-UMC-DETECTION-HEF - library and toolchain of hardware-accelerated
 YOLO detection models compiled to Hailo Executable Format (HEF), consumed by

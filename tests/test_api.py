@@ -1,7 +1,7 @@
 # =============================================================================
 # HYDRA-UMC-DETECTION-HEF - tests/test_api.py
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-# GPL-3.0 - see LICENSE
+# GPL-3.0-or-later - see LICENSE
 # =============================================================================
 """Real end-to-end HTTP tests: a real RegistryServer (ThreadingHTTPServer)
 against a real registry.json/models_dir on tmp_path, hit with real urllib

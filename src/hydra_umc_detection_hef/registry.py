@@ -1,7 +1,7 @@
 # =============================================================================
 # HYDRA-UMC-DETECTION-HEF - src/hydra_umc_detection_hef/registry.py
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-# GPL-3.0 - see LICENSE
+# GPL-3.0-or-later - see LICENSE
 # =============================================================================
 """Compiled-model registry: versioning and integrity checking of .hef models.
 

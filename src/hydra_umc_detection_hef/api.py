@@ -1,7 +1,7 @@
 # =============================================================================
 # HYDRA-UMC-DETECTION-HEF - src/hydra_umc_detection_hef/api.py
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-# GPL-3.0 - see LICENSE
+# GPL-3.0-or-later - see LICENSE
 # =============================================================================
 """Plain JSON/HTTP surface (stdlib http.server) - same convention as this
 family's other api.py files. Registry and models directory are configured

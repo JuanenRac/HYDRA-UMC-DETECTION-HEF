@@ -1,7 +1,7 @@
 # =============================================================================
 # HYDRA-UMC-DETECTION-HEF - Container Build: Dockerfile
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-# GPL-3.0 - see LICENSE
+# GPL-3.0-or-later - see LICENSE
 # =============================================================================
 # Real, minimal image for the model-registry HTTP API (api.py's own
 # RegistryServer, stdlib http.server - pyproject.toml's own dependencies
