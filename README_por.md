@@ -17,6 +17,16 @@
 
 ---
 
+## 📋 Num relance
+
+| | |
+|---|---|
+| Versão | `0.1.3` |
+| Maturidade | Estabelecido |
+| Testes | 70 |
+| Tecnologia | Python / Hailo SDK / YOLOv10 .hef models |
+| Em hardware real | Ainda não: não há registo de execução em hardware real para esta versão |
+
 ## 1. 🛠️ VISÃO TÉCNICA GERAL
 
 O **HYDRA-UMC-DETECTION-HEF** destina-se a ser uma biblioteca e cadeia de ferramentas curadas para modelos de redes neuronais de alto desempenho compilados para o **Hailo Executable Format (HEF)**, afinados para ambientes industriais de microfábrica: montagem eletrónica, colocação de SMD e validação de cabeças de ferramenta.

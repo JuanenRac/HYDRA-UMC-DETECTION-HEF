@@ -17,6 +17,16 @@
 
 ---
 
+## 📋 ひと目で
+
+| | |
+|---|---|
+| バージョン | `0.1.3` |
+| 成熟度 | 確立 |
+| テスト | 70 |
+| 技術 | Python / Hailo SDK / YOLOv10 .hef models |
+| 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |
+
 ## 1. 🛠️ 技術概要
 
 **HYDRA-UMC-DETECTION-HEF** は、**Hailo Executable Format（HEF）** に
