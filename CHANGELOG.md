@@ -2,8 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## Unreleased
-
+## [Unreleased]
 (nothing yet)
 
 ## [Unreleased]
