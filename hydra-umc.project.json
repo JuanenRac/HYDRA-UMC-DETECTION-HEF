@@ -3,7 +3,7 @@
   "ecosystem": "HYDRA-UMC",
   "name": "HYDRA-UMC-DETECTION-HEF",
   "version": "0.1.4",
-  "role": "library",
+  "role": "service",
   "stack": "python",
   "technologies": [
     "Python",
