@@ -23,10 +23,11 @@
 
 | | |
 |---|---|
-| Version | `0.1.4` |
+| Version | `0.1.5` |
 | Maturity | Functional |
 | Tests | 70 |
 | Stack | Python / Hailo SDK / HEF model registry (no model compiled yet) |
+| Target | The Raspberry Pi CM5 of a HYDRA-UMC cell |
 | On real hardware | Not yet: no run on real hardware is recorded for this version |
 
 ## 1. 🛠️ TECHNICAL OVERVIEW

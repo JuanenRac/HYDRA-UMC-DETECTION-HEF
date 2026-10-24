@@ -23,10 +23,11 @@
 
 | | |
 |---|---|
-| 版本 | `0.1.4` |
+| 版本 | `0.1.5` |
 | 成熟度 | 可用 |
 | 测试 | 70 |
 | 技术栈 | Python / Hailo SDK / HEF model registry (no model compiled yet) |
+| 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
 
 ## 1. 🛠️ 技术概述

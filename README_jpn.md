@@ -23,10 +23,11 @@
 
 | | |
 |---|---|
-| バージョン | `0.1.4` |
+| バージョン | `0.1.5` |
 | 成熟度 | 機能する |
 | テスト | 70 |
 | 技術 | Python / Hailo SDK / HEF model registry (no model compiled yet) |
+| 対象 | HYDRA-UMC セルの Raspberry Pi CM5 |
 | 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |
 
 ## 1. 🛠️ 技術概要
