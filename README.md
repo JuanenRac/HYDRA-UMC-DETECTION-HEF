@@ -107,6 +107,7 @@ The diagram above already fixes the intended pipeline shape: PyTorch/YOLO traini
 HYDRA-UMC-DETECTION-HEF/
 ├── src/                 # Source code (hydra_umc_detection_hef package)
 │   └── hydra_umc_detection_hef/
+│       ├── __init__.py          # Package description and version
 │       ├── registry.py       # Model registry: schema validation, versioning, sha256 checks
 │       ├── compatibility.py  # Real safe-load gate: arch compatibility + checksum, combined
 │       ├── api.py            # Plain JSON/HTTP surface (stdlib http.server) over the model registry
@@ -120,7 +121,10 @@ HYDRA-UMC-DETECTION-HEF/
 │   └── hydra-umc-detection-hef.service # Local CM5 model-registry API systemd unit
 ├── tools/
 │   ├── build_test.py    # Non-versioning build/compile check (no version/CHANGELOG bump)
-│   └── ci_validate.py   # Manifest/CHANGELOG/docs validation used by CI
+│   ├── ci_validate.py   # Manifest/CHANGELOG/docs validation used by CI
+│   ├── _doc_policy.py   # Documentation rules shared by the family (a copy of HYDRA-UMC-SDK's, kept in sync)
+│   ├── _readme_parity.py # Check that the eight READMEs share one structure (a copy of HYDRA-UMC-SDK's, kept in sync)
+│   └── hydra_project_tool.py # The same commands in every repository: validate, test, ci, version, status, bump
 ├── pyproject.toml       # Package metadata, dependencies, odometer version
 ├── bump_version.py      # Odometer-style version bump (run only by the explicit `bump` command)
 ├── bump_manifest_version.py # Syncs hydra-umc.project.json's version to the native one (--sync)

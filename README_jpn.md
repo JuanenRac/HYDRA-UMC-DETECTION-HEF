@@ -122,6 +122,7 @@ ONNX にエクスポートされ、Hailo Dataflow Compiler を通じて INT8/INT
 HYDRA-UMC-DETECTION-HEF/
 ├── src/                 # ソースコード（hydra_umc_detection_hef パッケージ）
 │   └── hydra_umc_detection_hef/
+│       ├── __init__.py          # パッケージの説明とバージョン
 │       ├── registry.py       # モデルレジストリ：スキーマ検証、バージョン管理、sha256 チェックサム
 │       ├── compatibility.py  # 実際の安全なロードのゲート：アーキテクチャ互換性 + チェックサム
 │       ├── api.py            # シンプルなJSON/HTTPサーフェス(stdlibのhttp.server)。モデルレジストリを橋渡し
@@ -135,7 +136,10 @@ HYDRA-UMC-DETECTION-HEF/
 │   └── hydra-umc-detection-hef.service # ローカルCM5モデルレジストリAPIのsystemdユニット
 ├── tools/
 │   ├── build_test.py    # バージョンを増やさないビルドチェック
-│   └── ci_validate.py   # CI が使用するマニフェスト/CHANGELOG/ドキュメント検証
+│   ├── ci_validate.py   # CI が使用するマニフェスト/CHANGELOG/ドキュメント検証
+│   ├── _doc_policy.py   # ファミリー共通のドキュメント規則 (HYDRA-UMC-SDK のコピーで、同期を維持)
+│   ├── _readme_parity.py # 8つの README が同じ構造であることの検査 (HYDRA-UMC-SDK のコピーで、同期を維持)
+│   └── hydra_project_tool.py # すべてのリポジトリで共通のコマンド: validate、test、ci、version、status、bump
 ├── pyproject.toml       # パッケージメタデータ、依存関係、オドメーターバージョン
 ├── bump_version.py      # オドメーター式バージョンインクリメント（明示的な `bump` コマンドのみが実行）
 ├── bump_manifest_version.py # hydra-umc.project.json のバージョンをネイティブ版と同期(--sync)

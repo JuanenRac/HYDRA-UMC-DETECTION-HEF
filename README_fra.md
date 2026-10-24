@@ -107,6 +107,7 @@ Le diagramme ci-dessus fixe déjà la forme prévue du pipeline : l'entraînemen
 HYDRA-UMC-DETECTION-HEF/
 ├── src/                 # Code source (paquet hydra_umc_detection_hef)
 │   └── hydra_umc_detection_hef/
+│       ├── __init__.py          # Description et version du paquet
 │       ├── registry.py       # Registre de modèles : validation par schéma, versionnement, checksums sha256
 │       ├── compatibility.py  # Vraie passerelle de chargement sécurisé : compatibilité + checksum
 │       ├── api.py            # Surface JSON/HTTP simple (http.server de stdlib) sur le registre de modèles
@@ -120,7 +121,10 @@ HYDRA-UMC-DETECTION-HEF/
 │   └── hydra-umc-detection-hef.service # Unité systemd de l'API locale de registre de modèles sur la CM5
 ├── tools/
 │   ├── build_test.py    # Vérification de build sans versionnage
-│   └── ci_validate.py   # Validation manifeste/CHANGELOG/docs utilisée par CI
+│   ├── ci_validate.py   # Validation manifeste/CHANGELOG/docs utilisée par CI
+│   ├── _doc_policy.py   # Règles de documentation partagées par la famille (copie de celle de HYDRA-UMC-SDK, tenue synchronisée)
+│   ├── _readme_parity.py # Contrôle que les huit README partagent la même structure (copie de celui de HYDRA-UMC-SDK, tenue synchronisée)
+│   └── hydra_project_tool.py # Les mêmes commandes dans chaque dépôt : validate, test, ci, version, status, bump
 ├── pyproject.toml       # Métadonnées du paquet, dépendances, version compteur kilométrique
 ├── bump_version.py      # Incrément de version type compteur kilométrique (exécuté seulement par la commande `bump` explicite)
 ├── bump_manifest_version.py # Synchronise la version de hydra-umc.project.json avec la version native (--sync)

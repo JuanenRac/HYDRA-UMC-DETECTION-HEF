@@ -116,6 +116,7 @@ INT8/INT4 量化（生成 `.har`），最后打包为 [HYDRA-UMC-VISION-NODE](ht
 HYDRA-UMC-DETECTION-HEF/
 ├── src/                 # 源代码（hydra_umc_detection_hef 包）
 │   └── hydra_umc_detection_hef/
+│       ├── __init__.py          # 包说明与版本
 │       ├── registry.py       # 模型注册表：模式校验、版本管理、sha256 校验和
 │       ├── compatibility.py  # 真实的安全加载关卡：架构兼容性 + 校验和
 │       ├── api.py            # 简洁的 JSON/HTTP 接口(基于 stdlib http.server),桥接模型注册表
@@ -129,7 +130,10 @@ HYDRA-UMC-DETECTION-HEF/
 │   └── hydra-umc-detection-hef.service # 本地 CM5 模型注册表 API 的 systemd 单元
 ├── tools/
 │   ├── build_test.py    # 不递增版本号的构建检查
-│   └── ci_validate.py   # CI 使用的清单/CHANGELOG/文档校验
+│   ├── ci_validate.py   # CI 使用的清单/CHANGELOG/文档校验
+│   ├── _doc_policy.py   # 家族共享的文档规则 (HYDRA-UMC-SDK 的副本,保持同步)
+│   ├── _readme_parity.py # 检查八个 README 结构一致 (HYDRA-UMC-SDK 的副本,保持同步)
+│   └── hydra_project_tool.py # 每个仓库相同的命令: validate、test、ci、version、status、bump
 ├── pyproject.toml       # 包元数据、依赖项、里程表版本号
 ├── bump_version.py      # 里程表式版本递增（仅由显式 `bump` 命令运行）
 ├── bump_manifest_version.py # 将 hydra-umc.project.json 的版本与原生版本同步(--sync)
