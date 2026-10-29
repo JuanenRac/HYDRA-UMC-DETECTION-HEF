@@ -118,3 +118,31 @@ def test_model_identity_names_the_facts_a_consumer_records_with_its_results(tmp_
         "model_sha256": "ab" * 32,
         "hailo_arch": "hailo8",
     }
+
+
+def test_keep_bytes_returns_exactly_the_verified_bytes_and_default_returns_none(tmp_path):
+    content = b"verified payload"
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    hef = models_dir / "pcb-defect-0.1.0.hef"
+    hef.write_bytes(content)
+    reg_path = tmp_path / "registry.json"
+    _write_registry(reg_path, [_entry(hailo_arch="hailo8", sha256=hashlib.sha256(content).hexdigest())])
+    entry = load_registry(reg_path)[0]
+
+    assert safe_load(entry, models_dir, target_arch="hailo8").data is None
+    result = safe_load(entry, models_dir, target_arch="hailo8", keep_bytes=True)
+    hef.write_bytes(b"swapped after the check")  # the file changes later: the bytes returned are still the verified ones
+    assert result.is_ready and result.data == content
+
+
+def test_keep_bytes_gives_no_bytes_when_the_load_is_rejected(tmp_path):
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    (models_dir / "pcb-defect-0.1.0.hef").write_bytes(b"tampered")
+    reg_path = tmp_path / "registry.json"
+    _write_registry(reg_path, [_entry(hailo_arch="hailo8", sha256="a" * 64)])
+    entry = load_registry(reg_path)[0]
+
+    result = safe_load(entry, models_dir, target_arch="hailo8", keep_bytes=True)
+    assert result.outcome is LoadOutcome.REJECTED_CHECKSUM_MISMATCH and result.data is None

@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **`safe_load(..., keep_bytes=True)` returns the verified bytes:** the file is read once, hashed and kept in `LoadResult.data`, so a consumer that builds the model from those bytes cannot be handed a file that changed (or a symlink that was repointed) between the check and the use. The default call and the HTTP/CLI output are unchanged; `registry.read_verified` is the same single read for other callers.
 - **The notes of the project manifest no longer carry a hand-written test count:** the counts went out of date at every change; the number of tests is stated by the README, which is checked against the code.
 - **README in the universal layout:** the README and its seven translations follow the layout that the four families share (22 sections in a fixed order), with an architecture picture and a repository-structure picture drawn from `docs/architecture.json` and `docs/structure.json`; the CI validator checks both pictures and the file tree. Where the repository has a service or an MQTT transport, the README now says how to start it and which environment variables it reads.
 

@@ -21,10 +21,10 @@ against plain data (a target architecture string, a file's real bytes).
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from .registry import ModelEntry, verify_checksum
+from .registry import ModelEntry, read_verified
 
 
 class LoadOutcome(enum.Enum):
@@ -39,6 +39,10 @@ class LoadResult:
     outcome: LoadOutcome
     entry: ModelEntry
     detail: str
+    # The bytes whose sha256 was verified, only when `safe_load(..., keep_bytes=True)` and the outcome is READY. A
+    # consumer that builds the model from these bytes (instead of opening the path later) is not exposed to the file
+    # changing between the check and the use.
+    data: bytes | None = field(default=None, repr=False, compare=False)
 
     @property
     def is_ready(self) -> bool:
@@ -59,7 +63,7 @@ def check_arch_compatibility(entry: ModelEntry, target_arch: str) -> bool:
     return entry.hailo_arch == target_arch.strip().lower()
 
 
-def safe_load(entry: ModelEntry, models_dir: Path, target_arch: str) -> LoadResult:
+def safe_load(entry: ModelEntry, models_dir: Path, target_arch: str, keep_bytes: bool = False) -> LoadResult:
     """The real, combined safe-load decision for one registry entry.
 
     Checks architecture compatibility FIRST (pure metadata, no I/O) -
@@ -68,7 +72,7 @@ def safe_load(entry: ModelEntry, models_dir: Path, target_arch: str) -> LoadResu
     most fundamental failing gate rather than a misleading "file missing"
     for a model that was never going to run on this hardware anyway.
     Only once the architecture matches does it verify the checksum
-    against the real local file.
+    against the real local file. With `keep_bytes=True` the verified bytes come back in `LoadResult.data`.
     """
     if not check_arch_compatibility(entry, target_arch):
         return LoadResult(
@@ -77,7 +81,7 @@ def safe_load(entry: ModelEntry, models_dir: Path, target_arch: str) -> LoadResu
             detail=f"model compiled for {entry.hailo_arch!r}, this deployment targets {target_arch!r}",
         )
 
-    checksum_ok = verify_checksum(entry, models_dir)
+    checksum_ok, data = read_verified(entry, models_dir)
     if checksum_ok is None:
         return LoadResult(
             outcome=LoadOutcome.REJECTED_MISSING_FILE,
@@ -95,6 +99,7 @@ def safe_load(entry: ModelEntry, models_dir: Path, target_arch: str) -> LoadResu
         outcome=LoadOutcome.READY,
         entry=entry,
         detail=f"{entry.name} {entry.version} ({entry.hailo_arch}) verified and ready",
+        data=data if keep_bytes else None,
     )
 
 

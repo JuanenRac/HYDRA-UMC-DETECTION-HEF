@@ -316,6 +316,25 @@ def compute_sha256(file_path: Path) -> str:
     return digest.hexdigest()
 
 
+def read_verified(entry: ModelEntry, models_dir: Path) -> tuple[bool | None, bytes | None]:
+    """Like `verify_checksum`, but reads the file ONCE and returns the bytes that were hashed: `(None, None)` when the
+    file is absent, `(False, None)` when the hash differs, `(True, data)` when it matches. A consumer that loads `data`
+    (instead of opening the path again later) cannot get a file that changed, or a symlink that was repointed, between
+    the check and the use. The path is confined under `models_dir` exactly as in `verify_checksum`."""
+    file_path = models_dir / entry.hef_path
+    if not file_path.resolve().is_relative_to(models_dir.resolve()):
+        raise RegistryError(
+            f"model {entry.name!r} {entry.version!r}: hef_path {entry.hef_path!r} "
+            f"resolves outside models_dir {models_dir}"
+        )
+    if not file_path.is_file():
+        return None, None
+    data = file_path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != entry.sha256:
+        return False, None
+    return True, data
+
+
 def verify_checksum(entry: ModelEntry, models_dir: Path) -> bool | None:
     """True/False if the file was found and checked, None if it's absent.
 
