@@ -447,3 +447,22 @@ quantization, real representative calibration data — neither is
 available in this environment, and neither is built here yet. This CLI
 covers the registry/versioning and safe-load bookkeeping around
 already-compiled `.hef` files, independent of that toolchain.
+
+## The optional `io_contract` of a registry entry
+
+A registry entry may carry an `io_contract` block that says how a consumer must feed the model and read what it returns, so that colour order, box order and letterbox offsets are not guessed. It is validated when the registry is loaded (a wrong value rejects the entry) and its sha256 is added to `model_identity()` as `io_contract_sha256`, so a consumer that records it can tell when the convention changed. An entry without the block loads as before.
+
+```json
+"io_contract": {
+  "input":  {"layout": "NHWC", "color_order": "RGB", "dtype": "uint8",
+             "normalization": "on-chip", "resize": "letterbox", "pad_value": 114},
+  "output": {"format": "hailo_nms_by_class", "bbox_order": "ymin,xmin,ymax,xmax",
+             "bbox_normalized": true, "nms_on_chip": true,
+             "max_detections_per_class": 100, "score_threshold": 0.25, "iou_threshold": 0.45}
+}
+```
+
+- `input.layout`: `NHWC` or `NCHW`. `color_order`: `RGB`, `BGR` or `GRAY`. `dtype`: `uint8` or `float32`. `resize`: `letterbox` (keep the aspect ratio and pad with `pad_value`, 0-255) or `stretch`.
+- `input.normalization`: `"on-chip"` (the model normalises) or `{"mean": [...], "std": [...]}` with the same length and `std` above 0.
+- `output.format`: `hailo_nms_by_class` (the NMS runs in the HEF and returns, per class, `[ymin, xmin, ymax, xmax, score]` normalised to 0..1 when `bbox_normalized` is true) or `raw_yolo`. `bbox_order`: `ymin,xmin,ymax,xmax` or `xmin,ymin,xmax,ymax`. `max_detections_per_class` is an integer above 0; `score_threshold` and `iou_threshold` are in 0..1.
+- Unknown keys are rejected, so a typo does not silently disappear.

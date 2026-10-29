@@ -18,11 +18,12 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import math
 import os
 import re
 import tempfile
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 _VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
@@ -50,6 +51,9 @@ class ModelEntry:
     hef_path: str
     sha256: str
     hailo_arch: str
+    # How a consumer must prepare the input and read the output of the model (colour order, normalisation, resize,
+    # box order, NMS). Optional in the registry file; when present it is validated by `validate_io_contract`.
+    io_contract: dict | None = field(default=None, compare=False, hash=False)
 
     @property
     def version_tuple(self) -> tuple[int, int, int]:
@@ -57,6 +61,82 @@ class ModelEntry:
         if match is None:
             raise RegistryError(f"malformed version {self.version!r} for model {self.name!r}")
         return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+
+_IO_INPUT_REQUIRED = ("layout", "color_order", "dtype", "normalization", "resize")
+_IO_INPUT_OPTIONAL = ("pad_value",)
+_IO_OUTPUT_REQUIRED = ("format", "bbox_order", "bbox_normalized", "nms_on_chip")
+_IO_OUTPUT_OPTIONAL = ("max_detections_per_class", "score_threshold", "iou_threshold")
+_IO_CHOICES = {
+    "layout": ("NHWC", "NCHW"),
+    "color_order": ("RGB", "BGR", "GRAY"),
+    "dtype": ("uint8", "float32"),
+    "resize": ("letterbox", "stretch"),
+    "format": ("hailo_nms_by_class", "raw_yolo"),
+    "bbox_order": ("ymin,xmin,ymax,xmax", "xmin,ymin,xmax,ymax"),
+}
+
+
+def _is_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def validate_io_contract(contract: object) -> list[str]:
+    """Every problem found in an `io_contract` block (empty list: valid). Nothing here needs the Hailo runtime."""
+    if not isinstance(contract, dict):
+        return ["io_contract must be a JSON object with an input and an output block"]
+    problems: list[str] = []
+    for extra in sorted(set(contract) - {"input", "output"}):
+        problems.append(f"io_contract: unknown key {extra!r}")
+    for part, required, optional in (
+        ("input", _IO_INPUT_REQUIRED, _IO_INPUT_OPTIONAL),
+        ("output", _IO_OUTPUT_REQUIRED, _IO_OUTPUT_OPTIONAL),
+    ):
+        block = contract.get(part)
+        if not isinstance(block, dict):
+            problems.append(f"io_contract.{part} is required and must be an object")
+            continue
+        for key in sorted(set(block) - set(required) - set(optional)):
+            problems.append(f"io_contract.{part}: unknown key {key!r}")
+        for key in required:
+            if key not in block:
+                problems.append(f"io_contract.{part}.{key} is required")
+        for key, allowed in _IO_CHOICES.items():
+            if key in block and block[key] not in allowed:
+                problems.append(f"io_contract.{part}.{key} must be one of {list(allowed)}")
+        for key in ("bbox_normalized", "nms_on_chip"):
+            if key in block and not isinstance(block[key], bool):
+                problems.append(f"io_contract.{part}.{key} must be true or false")
+    inp = contract.get("input") if isinstance(contract.get("input"), dict) else {}
+    norm = inp.get("normalization")
+    if "normalization" in inp and norm != "on-chip":
+        if not (isinstance(norm, dict) and set(norm) == {"mean", "std"}):
+            problems.append('io_contract.input.normalization must be "on-chip" or {"mean": [...], "std": [...]}')
+        else:
+            mean, std = norm["mean"], norm["std"]
+            if not (isinstance(mean, list) and mean and all(_is_number(v) for v in mean)):
+                problems.append("io_contract.input.normalization.mean must be a non-empty list of numbers")
+            if not (isinstance(std, list) and std and all(_is_number(v) and v > 0 for v in std)):
+                problems.append("io_contract.input.normalization.std must be a non-empty list of numbers above 0")
+            if isinstance(mean, list) and isinstance(std, list) and len(mean) != len(std):
+                problems.append("io_contract.input.normalization: mean and std must have the same length")
+    pad = inp.get("pad_value")
+    if "pad_value" in inp and not (isinstance(pad, int) and not isinstance(pad, bool) and 0 <= pad <= 255):
+        problems.append("io_contract.input.pad_value must be an integer in 0..255")
+    out = contract.get("output") if isinstance(contract.get("output"), dict) else {}
+    for key in ("score_threshold", "iou_threshold"):
+        if key in out and not (_is_number(out[key]) and 0.0 <= out[key] <= 1.0):
+            problems.append(f"io_contract.output.{key} must be a number in 0..1")
+    maxdet = out.get("max_detections_per_class")
+    if "max_detections_per_class" in out and not (isinstance(maxdet, int) and not isinstance(maxdet, bool) and maxdet > 0):
+        problems.append("io_contract.output.max_detections_per_class must be an integer above 0")
+    return problems
+
+
+def io_contract_sha256(contract: dict) -> str:
+    """sha256 of the contract as canonical JSON (sorted keys, no spaces), so two registries that spell it differently
+    but mean the same thing give the same hash."""
+    return hashlib.sha256(json.dumps(contract, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
 def _parse_entry(raw: object, index: int) -> ModelEntry:
@@ -108,11 +188,18 @@ def _parse_entry(raw: object, index: int) -> ModelEntry:
             "registry-validation time rather than at deploy time on the wrong chip"
         )
 
+    io_contract = None
+    if "io_contract" in raw:
+        problems = validate_io_contract(raw["io_contract"])
+        if problems:
+            raise RegistryError(f"entry {index}: " + "; ".join(problems))
+        io_contract = raw["io_contract"]
+
     return ModelEntry(
         name=raw["name"], version=raw["version"], task=raw["task"],
         input_shape=input_shape, classes=classes,
         hef_path=raw["hef_path"], sha256=raw["sha256"].lower(),
-        hailo_arch=raw["hailo_arch"],
+        hailo_arch=raw["hailo_arch"], io_contract=io_contract,
     )
 
 
@@ -138,7 +225,7 @@ def load_registry_or_empty(path: Path) -> list[ModelEntry]:
 
 
 def _entry_to_json(entry: ModelEntry) -> dict[str, object]:
-    return {
+    data: dict[str, object] = {
         "name": entry.name,
         "version": entry.version,
         "task": entry.task,
@@ -148,6 +235,9 @@ def _entry_to_json(entry: ModelEntry) -> dict[str, object]:
         "sha256": entry.sha256,
         "hailo_arch": entry.hailo_arch,
     }
+    if entry.io_contract is not None:
+        data["io_contract"] = entry.io_contract
+    return data
 
 
 def _fsync_directory(directory: Path) -> None:

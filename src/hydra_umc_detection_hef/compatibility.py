@@ -24,7 +24,7 @@ import enum
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .registry import ModelEntry, read_verified
+from .registry import ModelEntry, io_contract_sha256, read_verified
 
 
 class LoadOutcome(enum.Enum):
@@ -111,9 +111,13 @@ def model_identity(entry: ModelEntry) -> dict[str, str]:
     loaded model's identity can be attached to its detections as is. The
     pipeline version is the consumer's own to add.
     """
-    return {
+    identity = {
         "model_name": entry.name,
         "model_version": entry.version,
         "model_sha256": entry.sha256.lower(),
         "hailo_arch": entry.hailo_arch,
     }
+    if entry.io_contract is not None:
+        # a consumer that recorded this hash can tell that the way the model is fed or read has changed
+        identity["io_contract_sha256"] = io_contract_sha256(entry.io_contract)
+    return identity
