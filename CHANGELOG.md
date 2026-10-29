@@ -8,8 +8,6 @@ All notable changes to this project are documented here.
 
 - **The layout of the README is checked in the CI:** the validator runs `tools/universal_readme_check.py` and lists, as a warning, what differs from the universal layout of the README.
 
-(nothing yet)
-
 ## [0.1.5] - Building no longer changes the version; raising it is the explicit `bu
 
 - Building no longer changes the version; raising it is the explicit `bump` command (`python tools/hydra_project_tool.py bump`). The build scripts only report the version they built, and CI fails if a build script runs a bump.
