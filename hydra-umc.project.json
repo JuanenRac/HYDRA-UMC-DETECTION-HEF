@@ -21,6 +21,7 @@
     "pattern": "^version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\""
   },
   "service": {
+    "port": 8093,
     "systemd_unit": "hydra-umc-detection-hef.service",
     "health_path": "/stats"
   }
