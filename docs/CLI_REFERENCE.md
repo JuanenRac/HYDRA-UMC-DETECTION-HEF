@@ -274,7 +274,7 @@ $ echo $?
 
 ### `registry add --registry PATH --models-dir PATH --hef-path PATH --name NAME --version VERSION --task TASK --input-shape SHAPE --classes LABELS --hailo-arch ARCH`
 
-Found while auditing the code: until this
+Found while reading the code: until this
 command existed, the registry JSON was hand-edited, including the
 `sha256` `verify_checksum()` only ever checked, never generated. This
 hashes the real local `.hef` file with the same `compute_sha256()`

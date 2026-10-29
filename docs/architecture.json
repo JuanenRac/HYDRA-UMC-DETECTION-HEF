@@ -1,0 +1,115 @@
+{
+  "repo": "HYDRA-UMC-DETECTION-HEF",
+  "ecosystem": "hydra",
+  "tagline": "A registry of compiled Hailo models, and a gate that refuses a model that does not match.",
+  "description": "HYDRA-UMC-DETECTION-HEF keeps the registry of compiled .hef models: a name, a version, a task, an input shape, the classes and a SHA-256, validated against a schema. A load gate checks the checksum of the file and the Hailo architecture before a model may be loaded. The toolchain that compiles a model (ONNX export, the Hailo Dataflow Compiler, quantisation) is not part of this repository and needs the Hailo SDK on the CM5.",
+  "columns": [
+    "WHO ASKS",
+    "THIS REPOSITORY",
+    "WHAT IT DEPENDS ON"
+  ],
+  "nodes": [
+    {
+      "id": "ops",
+      "column": 0,
+      "level": "external",
+      "title": "VISION-NODE, operator",
+      "lines": [
+        "lookup and load over HTTP",
+        "or the command line"
+      ],
+      "title_size": 12
+    },
+    {
+      "id": "api",
+      "column": 1,
+      "level": "contract",
+      "title": "api.py, main.py",
+      "lines": [
+        "GET /registry, /latest, /load;",
+        "read only on 127.0.0.1"
+      ],
+      "code": [
+        "src/hydra_umc_detection_hef/api.py",
+        "src/hydra_umc_detection_hef/main.py"
+      ]
+    },
+    {
+      "id": "gate",
+      "column": 1,
+      "level": "contract",
+      "title": "compatibility.py",
+      "lines": [
+        "SHA-256 against the registry;",
+        "the declared Hailo architecture"
+      ],
+      "code": [
+        "src/hydra_umc_detection_hef/registry.py::KNOWN_HAILO_ARCHS"
+      ]
+    },
+    {
+      "id": "reg",
+      "column": 1,
+      "level": "tested",
+      "title": "registry.py",
+      "lines": [
+        "schema, X.Y.Z versions,",
+        "duplicates, latest version"
+      ],
+      "code": [
+        "src/hydra_umc_detection_hef/registry.py"
+      ]
+    },
+    {
+      "id": "files",
+      "column": 2,
+      "level": "external",
+      "title": "registry.json, models/",
+      "lines": [
+        "the registry file and the",
+        ".hef binaries on disk"
+      ],
+      "title_size": 12
+    },
+    {
+      "id": "hailo",
+      "column": 2,
+      "level": "untested",
+      "title": "Hailo toolchain, chip",
+      "lines": [
+        "compiling a model; no model",
+        "compiled or loaded here"
+      ],
+      "title_size": 12
+    }
+  ],
+  "edges": [
+    {
+      "from": "ops",
+      "to": "api",
+      "level": "tested"
+    },
+    {
+      "from": "api",
+      "to": "gate",
+      "level": "tested"
+    },
+    {
+      "from": "gate",
+      "to": "reg",
+      "level": "tested"
+    },
+    {
+      "from": "reg",
+      "to": "files",
+      "label": "reads",
+      "level": "tested"
+    },
+    {
+      "from": "gate",
+      "to": "hailo",
+      "level": "untested"
+    }
+  ],
+  "footer": "Registry only: no model has been compiled or run on a chip yet."
+}

@@ -1,0 +1,337 @@
+{
+  "repo": "HYDRA-UMC-DETECTION-HEF",
+  "ecosystem": "hydra",
+  "svg": "en",
+  "cards": [
+    {
+      "name": "src/hydra_umc_detection_hef/",
+      "span": 3,
+      "accent": "a",
+      "sub": {
+        "en": "the library and service, in Python",
+        "es": "la biblioteca y el servicio, en Python",
+        "de": "Bibliothek und Dienst in Python",
+        "fr": "la bibliothèque et le service, en Python",
+        "it": "la libreria e il servizio, in Python",
+        "ja": "Python のライブラリとサービス",
+        "zh": "用 Python 编写的库与服务",
+        "pt": "a biblioteca e o serviço, em Python"
+      },
+      "rows": [
+        {
+          "name": "registry.py",
+          "desc": {
+            "en": "the registry of compiled models",
+            "es": "el registro de modelos compilados",
+            "de": "die Registry der kompilierten Modelle",
+            "fr": "le registre des modèles compilés",
+            "it": "il registro dei modelli compilati",
+            "ja": "コンパイル済みモデルのレジストリ",
+            "zh": "已编译模型的注册表",
+            "pt": "o registo de modelos compilados"
+          }
+        },
+        {
+          "name": "compatibility.py",
+          "desc": {
+            "en": "the safe-load gate for a .hef",
+            "es": "la puerta de carga segura de un .hef",
+            "de": "das sichere Ladetor für eine .hef",
+            "fr": "la porte de chargement sûr d'un .hef",
+            "it": "la porta di caricamento sicuro di un .hef",
+            "ja": ".hef の安全なロードのゲート",
+            "zh": ".hef 的安全加载关口",
+            "pt": "a porta de carga segura de um .hef"
+          }
+        },
+        {
+          "name": "api.py",
+          "desc": {
+            "en": "read-only HTTP surface",
+            "es": "interfaz HTTP de solo lectura",
+            "de": "schreibgeschützte HTTP-Schnittstelle",
+            "fr": "interface HTTP en lecture seule",
+            "it": "interfaccia HTTP di sola lettura",
+            "ja": "読み取り専用の HTTP 窓口",
+            "zh": "只读 HTTP 接口",
+            "pt": "interface HTTP só de leitura"
+          }
+        },
+        {
+          "name": "main.py",
+          "desc": {
+            "en": "command line and start-up",
+            "es": "línea de órdenes y arranque",
+            "de": "Kommandozeile und Start",
+            "fr": "ligne de commande et démarrage",
+            "it": "riga di comando e avvio",
+            "ja": "コマンドラインと起動",
+            "zh": "命令行与启动",
+            "pt": "linha de comandos e arranque"
+          }
+        }
+      ]
+    },
+    {
+      "name": {
+        "en": "tests, docs and tools",
+        "es": "pruebas, docs y herramientas",
+        "de": "Tests, Doku und Werkzeuge",
+        "fr": "tests, docs et outils",
+        "it": "test, documenti e strumenti",
+        "ja": "テスト・文書・ツール",
+        "zh": "测试、文档和工具",
+        "pt": "testes, docs e ferramentas"
+      },
+      "kind": "group",
+      "span": 3,
+      "accent": "b",
+      "columns": 2,
+      "rows": [
+        {
+          "name": "tests/",
+          "desc": {
+            "en": "70 tests",
+            "es": "70 pruebas",
+            "de": "70 Tests",
+            "fr": "70 tests",
+            "it": "70 test",
+            "ja": "70 件",
+            "zh": "70 项测试",
+            "pt": "70 testes"
+          }
+        },
+        {
+          "name": "docs/",
+          "desc": {
+            "en": "the command-line reference",
+            "es": "la referencia de la línea de órdenes",
+            "de": "die Kommandozeilen-Referenz",
+            "fr": "la référence de la ligne de commande",
+            "it": "il riferimento della riga di comando",
+            "ja": "コマンドラインのリファレンス",
+            "zh": "命令行参考",
+            "pt": "a referência da linha de comandos"
+          }
+        },
+        {
+          "name": "systemd/",
+          "desc": {
+            "en": "service unit for the CM5",
+            "es": "unidad de servicio para la CM5",
+            "de": "Dienst-Unit für den CM5",
+            "fr": "unité de service pour la CM5",
+            "it": "unità di servizio per la CM5",
+            "ja": "CM5 用のサービスユニット",
+            "zh": "CM5 的服务单元",
+            "pt": "unidade de serviço para o CM5"
+          }
+        },
+        {
+          "name": "tools/",
+          "desc": {
+            "en": "project tools, CI checks, version bump",
+            "es": "herramientas del proyecto, comprobaciones de CI, subida de versión",
+            "de": "Projektwerkzeuge, CI-Prüfungen, Versionserhöhung",
+            "fr": "outils du projet, vérifications CI, montée de version",
+            "it": "strumenti del progetto, controlli CI, aumento di versione",
+            "ja": "プロジェクトのツール、CI の検査、バージョンの引き上げ",
+            "zh": "项目工具、CI 检查、版本提升",
+            "pt": "ferramentas do projeto, verificações de CI, subida de versão"
+          },
+          "tree_desc": {
+            "en": "build and test runner, version bump, CI validator, README and picture generators and checks",
+            "es": "ejecutor de compilación y pruebas, subida de versión, validador de CI, generadores y comprobaciones de README e imágenes",
+            "de": "Build- und Testläufer, Versionserhöhung, CI-Prüfer, README- und Bildgeneratoren samt Prüfungen",
+            "fr": "exécuteur de build et de tests, montée de version, validateur CI, générateurs et vérifications des README et des images",
+            "it": "esecutore di build e test, aumento di versione, validatore CI, generatori e controlli di README e immagini",
+            "ja": "ビルド・テスト実行、バージョン引き上げ、CI 検証、README と図の生成・検査",
+            "zh": "构建与测试运行器、版本提升、CI 校验、README 与图片的生成和检查",
+            "pt": "executor de compilação e testes, subida de versão, validador de CI, geradores e verificações de README e imagens"
+          }
+        },
+        {
+          "name": "images/",
+          "desc": {
+            "en": "banner and the pictures of the README",
+            "es": "banner y las imágenes del README",
+            "de": "Banner und die Bilder der README",
+            "fr": "bannière et images du README",
+            "it": "banner e immagini del README",
+            "ja": "バナーと README の図",
+            "zh": "横幅图与 README 的图片",
+            "pt": "faixa e imagens do README"
+          }
+        },
+        {
+          "name": ".github/",
+          "desc": {
+            "en": "CI workflow and issue templates",
+            "es": "flujo de CI y plantillas de incidencias",
+            "de": "CI-Workflow und Issue-Vorlagen",
+            "fr": "workflow CI et modèles de tickets",
+            "it": "workflow CI e modelli di segnalazione",
+            "ja": "CI ワークフローと Issue テンプレート",
+            "zh": "CI 工作流和 Issue 模板",
+            "pt": "fluxo de CI e modelos de questões"
+          }
+        }
+      ]
+    },
+    {
+      "name": {
+        "en": "project files",
+        "es": "ficheros del proyecto",
+        "de": "Projektdateien",
+        "fr": "fichiers du projet",
+        "it": "file del progetto",
+        "ja": "プロジェクトのファイル",
+        "zh": "项目文件",
+        "pt": "ficheiros do projeto"
+      },
+      "kind": "group",
+      "span": 3,
+      "accent": "c",
+      "columns": 2,
+      "rows": [
+        {
+          "name": "pyproject.toml",
+          "desc": {
+            "en": "package metadata and dependencies",
+            "es": "metadatos del paquete y dependencias",
+            "de": "Paketmetadaten und Abhängigkeiten",
+            "fr": "métadonnées du paquet et dépendances",
+            "it": "metadati del pacchetto e dipendenze",
+            "ja": "パッケージのメタデータと依存関係",
+            "zh": "包元数据与依赖",
+            "pt": "metadados do pacote e dependências"
+          }
+        },
+        {
+          "name": "hydra-umc.project.json",
+          "desc": {
+            "en": "manifest: version, maturity, family",
+            "es": "manifiesto: versión, madurez, familia",
+            "de": "Manifest: Version, Reifegrad, Familie",
+            "fr": "manifeste : version, maturité, famille",
+            "it": "manifesto: versione, maturità, famiglia",
+            "ja": "マニフェスト：バージョン・成熟度・ファミリー",
+            "zh": "清单：版本、成熟度、系列",
+            "pt": "manifesto: versão, maturidade, família"
+          }
+        },
+        {
+          "name": "CHANGELOG.md",
+          "desc": {
+            "en": "what changed in each version",
+            "es": "qué cambió en cada versión",
+            "de": "was sich in jeder Version geändert hat",
+            "fr": "ce qui a changé à chaque version",
+            "it": "cosa è cambiato in ogni versione",
+            "ja": "各バージョンの変更点",
+            "zh": "每个版本的变化",
+            "pt": "o que mudou em cada versão"
+          }
+        },
+        {
+          "name": "build.sh  build.bat",
+          "tree_name": "build.sh build.bat",
+          "desc": {
+            "en": "build scripts (they never change the version)",
+            "es": "scripts de compilación (nunca cambian la versión)",
+            "de": "Build-Skripte (ändern die Version nie)",
+            "fr": "scripts de build (ils ne changent jamais la version)",
+            "it": "script di build (non cambiano mai la versione)",
+            "ja": "ビルドスクリプト（バージョンは変えません）",
+            "zh": "构建脚本（从不改变版本）",
+            "pt": "scripts de compilação (nunca mudam a versão)"
+          }
+        },
+        {
+          "name": "build-test.sh  build-test.bat",
+          "tree_name": "build-test.sh build-test.bat",
+          "desc": {
+            "en": "build scripts (they never change the version)",
+            "es": "scripts de compilación (nunca cambian la versión)",
+            "de": "Build-Skripte (ändern die Version nie)",
+            "fr": "scripts de build (ils ne changent jamais la version)",
+            "it": "script di build (non cambiano mai la versione)",
+            "ja": "ビルドスクリプト（バージョンは変えません）",
+            "zh": "构建脚本（从不改变版本）",
+            "pt": "scripts de compilação (nunca mudam a versão)"
+          }
+        },
+        {
+          "name": "test.sh  test.bat",
+          "tree_name": "test.sh test.bat",
+          "desc": {
+            "en": "run the tests",
+            "es": "ejecutan las pruebas",
+            "de": "führen die Tests aus",
+            "fr": "lancent les tests",
+            "it": "eseguono i test",
+            "ja": "テストを実行",
+            "zh": "运行测试",
+            "pt": "executam os testes"
+          }
+        },
+        {
+          "name": "Dockerfile",
+          "desc": {
+            "en": "container image",
+            "es": "imagen de contenedor",
+            "de": "Container-Image",
+            "fr": "image de conteneur",
+            "it": "immagine di container",
+            "ja": "コンテナイメージ",
+            "zh": "容器镜像",
+            "pt": "imagem de contentor"
+          }
+        },
+        {
+          "name": "bump_version.py",
+          "desc": {
+            "en": "explicit version bump",
+            "es": "subida de versión explícita",
+            "de": "ausdrückliche Versionserhöhung",
+            "fr": "montée de version explicite",
+            "it": "aumento di versione esplicito",
+            "ja": "明示的なバージョン引き上げ",
+            "zh": "显式的版本提升",
+            "pt": "subida de versão explícita"
+          },
+          "tree_name": "bump_version.py / bump_manifest_version.py"
+        },
+        {
+          "name": "run.sh  run.bat",
+          "desc": {
+            "en": "start the service",
+            "es": "arrancar el servicio",
+            "de": "den Dienst starten",
+            "fr": "démarrer le service",
+            "it": "avviare il servizio",
+            "ja": "サービスを起動",
+            "zh": "启动服务",
+            "pt": "arrancar o serviço"
+          },
+          "tree_name": "run.sh run.bat"
+        },
+        {
+          "name": "SECURITY  SUPPORT  CONTRIBUTING  LICENSE",
+          "tree_name": "SECURITY.md SUPPORT.md CONTRIBUTING.md CODE_OF_CONDUCT.md LICENSE LICENSE.md",
+          "desc": {
+            "en": "community and licence files",
+            "es": "comunidad y licencia",
+            "de": "Community und Lizenz",
+            "fr": "communauté et licence",
+            "it": "comunità e licenza",
+            "ja": "コミュニティとライセンス",
+            "zh": "社区与许可证",
+            "pt": "comunidade e licença"
+          },
+          "tree_desc": ""
+        }
+      ]
+    }
+  ]
+}

@@ -1,3 +1,9 @@
+<!-- =============================================================================
+HYDRA-UMC-DETECTION-HEF - Compiled-model registry
+Copyright (C) JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+GPL-3.0-or-later - see LICENSE
+============================================================================= -->
+
 <p align="center">
   <img src="images/HYDRA_UMC_BANNER.svg" alt="HYDRA-UMC-DETECTION-HEF banner" width="100%">
 </p>
@@ -9,15 +15,19 @@
 ### 📦 Registry für kompilierte Modelle und Safe-Load-Prüfung für Hailo-HEF-Modelle (noch wird kein Modell kompiliert oder ausgeführt)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Lizenz-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
-  <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="HEF">
-  <img src="https://img.shields.io/badge/Modelle-Noch%20keines%3A%20nur%20Registry-lightgrey.svg" alt="Noch wird kein Modell kompiliert: nur die Registry">
-  <img src="https://img.shields.io/badge/Stufe-Funktional%20v0-green.svg" alt="Funktional v0">
+  <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
+  <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="Format">
+  <img src="https://img.shields.io/badge/Models-None%20yet%3A%20registry%20only-lightgrey.svg" alt="Models">
+  <img src="https://img.shields.io/badge/Tests-70%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Version-0.1.5-0f6cbd.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
 
 ---
 
 > **Stand von Sicherheit (Safety) und Security:** Dieses Ökosystem ist kein zertifiziertes Sicherheitssystem. Es gibt noch keinen Hardware-E-STOP-Pfad, keine von der Firmware durchgesetzten Grenzen oder Verriegelungen und keinen verifizierten Bewegungsbefehl; Firmware-Images werden mit CRC32 und einem HMAC-SHA256 mit gemeinsamem Schlüssel geprüft, nicht mit einer asymmetrischen Signatur; TLS und gegenseitiges TLS sind optional und standardmäßig aus; noch keine eigene Platine wurde bestückt oder getestet. Lesen Sie die [Sicherheitsbasis](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md) und das [Bedrohungsmodell](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md), bevor Sie sich für die Sicherheit einer Person auf eine Aussage hier verlassen.
+
+---
 
 ## 📋 Auf einen Blick
 
@@ -29,6 +39,8 @@
 | Technik | Python / Hailo SDK / HEF model registry (no model compiled yet) |
 | Ziel | Der Raspberry Pi CM5 einer HYDRA-UMC-Zelle |
 | Auf echter Hardware | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
+
+**Springe zu:** [Überblick](#-überblick) · [Architektur](#-architektur) · [Funktionen](#-funktionen) · [Sicherheit und Schutz](#-sicherheit-und-schutz) · [Schnittstellen](#-schnittstellen) · [Konfiguration](#-konfiguration) · [Schnellstart](#-schnellstart) · [Tests](#-tests) · [Fehlerbehebung](#-fehlerbehebung) · [Struktur des Repositorys](#-struktur-des-repositorys) · [Verwandte Projekte](#-verwandte-projekte)
 
 ## 🚦 Projektstatus
 
@@ -43,7 +55,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel sagt, wie weit er heut
 | Echte Hardware | 🔴 | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
 | Dokumentation | 🟢 | README in acht Sprachen, bei jeder Änderung gegen das Manifest geprüft |
 
-## 1. 🛠️ TECHNISCHER ÜBERBLICK
+## 🎯 Überblick
 
 **HYDRA-UMC-DETECTION-HEF** soll eine kuratierte Bibliothek und Toolchain für leistungsstarke neuronale Netzwerkmodelle werden, kompiliert in das **Hailo Executable Format (HEF)**, abgestimmt auf industrielle Mikrofabrik-Umgebungen: Elektronikmontage, SMD-Bestückung und Werkzeugkopf-Validierung.
 
@@ -51,7 +63,49 @@ Das Kompilieren eines Modells (ONNX, dann der Hailo Dataflow Compiler, dann eine
 
 Dies ist eines der 4 Kind-Projekte von **[HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE)**, dem Integrations-Elternteil der Familie: Dieses Projekt besitzt nur Modellkompilierung und -versionierung - die ausgelieferte, laufende Kopie eines `.hef`-Modells wird vom Elternteil geladen und ausgeführt, dem das Hailo-8-Gerätehandle gehört, nicht von diesem Projekt.
 
-### Kernpunkte
+## 🧩 Rolle in HYDRA-UMC
+
+**HYDRA-UMC-DETECTION-HEF** ist das Regal, auf dem die kompilierten Modelle des Vision-Knotens geordnet liegen: Jedes Modell hat Namen, Version, Aufgabe, Eingabeform, Klassen und Prüfsumme, und nichts darf geladen werden, was nicht passt. Auf einem Hailo-Chip wurde noch kein Modell kompiliert oder ausgeführt.
+
+## 🏛️ Architektur
+
+Das Diagramm unten ist die Ziel-*Kompilierungs*-Toolchain, auf die dieses Projekt hinarbeitet - immer noch nicht implementiert, da jeder Schritt echte Hailo-Hardware benötigt. Das Modell*register* (Versionierung + Integritätsprüfung der `.hef`-Dateien, die diese Pipeline eines Tages erzeugt) ist heute real; siehe "Kernpunkte" oben und die Designentscheidungen unten.
+
+<p align="center">
+  <img src="images/architecture.svg" alt="HYDRA-UMC-DETECTION-HEF architecture" width="100%">
+</p>
+
+<details>
+<summary>Textversion des Diagramms (Mermaid)</summary>
+
+```mermaid
+flowchart LR
+    TRAIN["Training (PyTorch/YOLO)"] --> ONNX["Export nach ONNX"]
+    ONNX --> DFC["Hailo Dataflow Compiler"]
+    DFC --> HAR["Quantisierung (HAR)"]
+    HAR --> HEF["HEF-Binärdatei"]
+    HEF --> NODE["HYDRA-UMC-VISION-NODE"]
+```
+
+</details>
+
+**Warum es so gebaut ist**
+
+### Warum es hier kein `hardware/`/`firmware/` gibt und `os/`/`models/` im Elternteil bleiben
+
+Dieses Projekt liefert Modelldateien und die Werkzeuge, die sie kompilieren, kein physisches Gerät - daher trägt es, wie der Rest der Vision-AI-Node-Familie, keinen `hardware/`/`firmware/`-Ordner. Es trägt auch kein `os/` oder `models/`, obwohl `.hef`-Dateien hier buchstäblich *erzeugt* werden: Die *ausgelieferte, laufende* Kopie, die zur Laufzeit auf die Hailo-8-NPU geladen wird, lebt nur im Integrations-Elternteil, [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE), da dieser der Prozess ist, dem das Hailo-8-Gerätehandle gehört. Das eigene `build/` dieses Projekts ist der Ort, an dem kompilierte Toolchain-Ausgaben landen sollen, bevor sie dort veröffentlicht werden.
+
+### Der Kompilierungsablauf ist die Designentscheidung, vor dem Code
+
+Das obige Diagramm legt die geplante Pipeline-Form bereits fest: PyTorch/YOLO-Training findet anderswo statt (außerhalb des Umfangs dieses Repositorys), Modelle werden nach ONNX exportiert, durchlaufen den Hailo Dataflow Compiler für INT8/INT4-Quantisierung (was ein `.har` erzeugt) und werden schließlich als `.hef`-Binärdatei paketiert, die [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE) konsumiert. Diese Form jetzt zu entscheiden und zu dokumentieren, bevor der Toolchain-Code geschrieben wird, erspart der endgültigen Implementierung, die Modellregister-/Versionierungsgeschichte später improvisieren zu müssen.
+
+### Bereits getroffene Designentscheidungen
+
+* **Eine fehlende lokale `.hef`-Datei ist kein Checksummen-Fehler** - `verify_checksum()` gibt `None` (nicht `False`) zurück, wenn die vom Register beschriebene Datei nicht unter `--models-dir` vorhanden ist, und `registry validate` meldet dies als "skipped", nicht als Fehler. Das Register soll Modelle beschreiben können, die in einem separaten Object-Store liegen, nicht notwendigerweise in diesem Repo eingecheckt - nur eine tatsächlich abweichende Checksumme für eine vorhandene Datei zeigt ein beschädigtes Register an.
+* **Warum `safe_load()` die Architektur vor der Checksumme prüft, nicht umgekehrt.** Architektur-Kompatibilität ist reine Metadaten (keine I/O); die Checksummen-Prüfung muss eine echte Datei lesen. Zuerst das billige, fundamentale Gate zu prüfen bedeutet, dass ein für den falschen Hailo-Chip kompiliertes Modell abgelehnt wird, bevor überhaupt das Dateisystem berührt wird, und der Ablehnungsgrund nennt die tatsächlich fehlgeschlagene fundamentale Prüfung statt eines irreführenden "Datei fehlt" für ein Modell, das ohnehin nie auf dieser Hardware gelaufen wäre.
+* **Warum Architektur-Kompatibilität eine exakte Übereinstimmung ist, keine Kompatibilitätsmatrix.** Der Hailo Dataflow Compiler brennt den Ziel-Chip zur Kompilierzeit in eine `.hef` ein - zu behaupten, dass z.B. ein Hailo-15H eine Hailo-8-`.hef` ausführen könnte, würde eine echte architekturübergreifende Validierung auf echter Hardware erfordern, die diese Umgebung nicht hat. Exakte Übereinstimmung ist die einzige Kompatibilitätsaussage, die allein aus den Register-Metadaten ehrlich nachweisbar ist.
+
+## ✨ Funktionen
 
 * ✅ **Echtes v0 - Modellregister:** `registry.py` parst und schema-validiert ein JSON-Register kompilierter Modelle, erkennt doppelte Name+Version-Einträge, findet die neueste Version für einen Namen/Task, und prüft lokale `.hef`-Dateien per sha256-Checksumme gegen das Register. Über `registry validate`/`registry latest`/`registry add` unten verfügbar - kein Hailo-SDK oder Hardware nötig, um es auszuführen oder zu testen.
 * 🔒 **Echtes v0 - Sicheres-Laden-Gate:** `safe_load()` in `compatibility.py` prüft die echte Hailo-Architektur-Kompatibilität (`hailo8`/`hailo15h`/usw. - jeder Registereintrag deklariert jetzt seinen Ziel-Chip) vor der Checksummen-Prüfung und meldet ein Modell nur dann als bereit zum Deployment, wenn beide echten Prüfungen bestehen. Über `registry load` unten verfügbar.
@@ -64,80 +118,32 @@ Dies ist eines der 4 Kind-Projekte von **[HYDRA-UMC-VISION-NODE](https://github.
 
 **Ehrlichkeitscheck - was heute wirklich läuft:** die reale, hardwareunabhängige Hälfte der Aufgabe dieses Projekts - das Modellregister (`registry.py`) und das echte Sicheres-Laden-Gate (`compatibility.py`), verfügbar über `registry validate`/`registry latest`/`registry load` und, als langlebige JSON/HTTP-API, über `serve` (`api.py`) - ist implementiert und getestet (70 Tests). Der ONNX-Export, die Quantisierung über den Hailo Dataflow Compiler und die HAR/HEF-Paketierung, die die von diesem Register beschriebenen Modelle tatsächlich erzeugen würden, bleiben zukünftige Arbeit: sie benötigen echte Hailo-Hardware, die diese Umgebung nicht hat. Siehe [`CHANGELOG.md`](CHANGELOG.md) für genau das, was bisher geliefert wurde, und "Aktueller Status & Nächste Schritte" unten für das, was noch offen ist.
 
----
+## 🔒 Sicherheit und Schutz
 
-## 2. 🔄 GEPLANTER MODELLKOMPILIERUNGS-ABLAUF
+| Bedrohung | Abwehr | Wo |
+|---|---|---|
+| Ein beschädigtes oder für einen anderen Chip gedachtes Modell laden | Das Ladetor (`compatibility.py`) vergleicht den SHA-256 der `.hef` mit der Registry und die Hailo-Architektur mit `KNOWN_HAILO_ARCHS` (`hailo8`, `hailo8r`, `hailo8l`, `hailo15h`, `hailo15m`, `hailo15l`, `hailo10h`); Laden braucht `--target-arch` | `compatibility.py`, `registry.py` |
+| Eine doppelte oder fehlerhafte Version | Die Registry prüft ihr Schema, verlangt Versionen der Form `X.Y.Z` und meldet Duplikate | `registry.py` |
+| Offenlegung im Netz | Die HTTP-Schnittstelle ist schreibgeschützt und lauscht standardmäßig auf `127.0.0.1:8093`. Sie hat kein Token: ob sie eines braucht, ist offen | `api.py`, `main.py` |
 
-Das Diagramm unten ist die Ziel-*Kompilierungs*-Toolchain, auf die dieses Projekt hinarbeitet - immer noch nicht implementiert, da jeder Schritt echte Hailo-Hardware benötigt. Das Modell*register* (Versionierung + Integritätsprüfung der `.hef`-Dateien, die diese Pipeline eines Tages erzeugt) ist heute real; siehe "Kernpunkte" oben und die Designentscheidungen unten.
+**Was er nie tut:** er kompiliert nichts und führt kein Modell aus: Er hält und prüft nur die Registry kompilierter Dateien.
 
-```mermaid
-flowchart LR
-    TRAIN["Training (PyTorch/YOLO)"] --> ONNX["Export nach ONNX"]
-    ONNX --> DFC["Hailo Dataflow Compiler"]
-    DFC --> HAR["Quantisierung (HAR)"]
-    HAR --> HEF["HEF-Binärdatei"]
-    HEF --> NODE["HYDRA-UMC-VISION-NODE"]
-```
+## 🔌 Schnittstellen
 
----
+HTTP standardmäßig auf `127.0.0.1:8093` (schreibgeschützt) und eine Kommandozeile. Die vollständige Referenz ist `docs/CLI_REFERENCE.md`.
 
-## 3. 🧠 ERWEITERTE TECHNISCHE INFORMATIONEN
+| Topic oder Route | Was es trägt |
+|---|---|
+| `GET /registry`, `GET /registry/latest`, `GET /registry/load` | die Registry, die neueste Version eines Modells und das Ergebnis des Ladetors |
+| `GET /stats` | Gesundheit |
+| `registry validate \| latest \| load \| add` | `--registry`, `--models-dir`, `--hef-path`, `--name`, `--version X.Y.Z`, `--task`, `--input-shape 640,640,3`, `--classes`, `--hailo-arch` |
+| `serve` | `--registry DATEI --models-dir VERZ --addr 127.0.0.1 --port 8093` |
 
-### Warum es hier kein `hardware/`/`firmware/` gibt und `os/`/`models/` im Elternteil bleiben
+## ⚙️ Konfiguration
 
-Dieses Projekt liefert Modelldateien und die Werkzeuge, die sie kompilieren, kein physisches Gerät - daher trägt es, wie der Rest der Vision-AI-Node-Familie, keinen `hardware/`/`firmware/`-Ordner. Es trägt auch kein `os/` oder `models/`, obwohl `.hef`-Dateien hier buchstäblich *erzeugt* werden: Die *ausgelieferte, laufende* Kopie, die zur Laufzeit auf die Hailo-8-NPU geladen wird, lebt nur im Integrations-Elternteil, [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE), da dieser der Prozess ist, dem das Hailo-8-Gerätehandle gehört. Das eigene `build/` dieses Projekts ist der Ort, an dem kompilierte Toolchain-Ausgaben landen sollen, bevor sie dort veröffentlicht werden.
+Es gibt keine Umgebungsvariablen: Alles ist eine Kommandozeilenoption (`--registry` wird immer gebraucht, `--models-dir` hängt vom Befehl ab).
 
-### Der Kompilierungsablauf ist die Designentscheidung, vor dem Code
-
-Das obige Diagramm legt die geplante Pipeline-Form bereits fest: PyTorch/YOLO-Training findet anderswo statt (außerhalb des Umfangs dieses Repositorys), Modelle werden nach ONNX exportiert, durchlaufen den Hailo Dataflow Compiler für INT8/INT4-Quantisierung (was ein `.har` erzeugt) und werden schließlich als `.hef`-Binärdatei paketiert, die [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE) konsumiert. Diese Form jetzt zu entscheiden und zu dokumentieren, bevor der Toolchain-Code geschrieben wird, erspart der endgültigen Implementierung, die Modellregister-/Versionierungsgeschichte später improvisieren zu müssen.
-
-### Bereits getroffene Designentscheidungen
-
-* **Die Version wird aus den Metadaten des installierten Pakets gelesen, nicht fest codiert** - `main.py` ruft `importlib.metadata.version("hydra-umc-detection-hef")` statt einer zweiten `__version__`-Zeichenkette auf, sodass `bump_version.py` nur eine Stelle zu bearbeiten hat.
-* **Der "Kilometerzähler"-Bump berührt automatisch nur `PATCH`/`MINOR`** - `bump_version.py` überträgt `PATCH` auf `MINOR` über 9 hinaus und `MINOR` auf `MAJOR` über 9 hinaus, erhöht aber nie `MAJOR` selbst; dieselbe Konvention wie `HYDRA-UMC-EDITOR-URDF/bump_version.py` und `HYDRA-UMC-SUITE/bump_version.py`.
-* **Eine fehlende lokale `.hef`-Datei ist kein Checksummen-Fehler** - `verify_checksum()` gibt `None` (nicht `False`) zurück, wenn die vom Register beschriebene Datei nicht unter `--models-dir` vorhanden ist, und `registry validate` meldet dies als "skipped", nicht als Fehler. Das Register soll Modelle beschreiben können, die in einem separaten Object-Store liegen, nicht notwendigerweise in diesem Repo eingecheckt - nur eine tatsächlich abweichende Checksumme für eine vorhandene Datei zeigt ein beschädigtes Register an.
-* **Warum `safe_load()` die Architektur vor der Checksumme prüft, nicht umgekehrt.** Architektur-Kompatibilität ist reine Metadaten (keine I/O); die Checksummen-Prüfung muss eine echte Datei lesen. Zuerst das billige, fundamentale Gate zu prüfen bedeutet, dass ein für den falschen Hailo-Chip kompiliertes Modell abgelehnt wird, bevor überhaupt das Dateisystem berührt wird, und der Ablehnungsgrund nennt die tatsächlich fehlgeschlagene fundamentale Prüfung statt eines irreführenden "Datei fehlt" für ein Modell, das ohnehin nie auf dieser Hardware gelaufen wäre.
-* **Warum Architektur-Kompatibilität eine exakte Übereinstimmung ist, keine Kompatibilitätsmatrix.** Der Hailo Dataflow Compiler brennt den Ziel-Chip zur Kompilierzeit in eine `.hef` ein - zu behaupten, dass z.B. ein Hailo-15H eine Hailo-8-`.hef` ausführen könnte, würde eine echte architekturübergreifende Validierung auf echter Hardware erfordern, die diese Umgebung nicht hat. Exakte Übereinstimmung ist die einzige Kompatibilitätsaussage, die allein aus den Register-Metadaten ehrlich nachweisbar ist.
-
----
-
-## 📂 VERZEICHNISSTRUKTUR
-
-```text
-HYDRA-UMC-DETECTION-HEF/
-├── src/                 # Quellcode (Paket hydra_umc_detection_hef)
-│   └── hydra_umc_detection_hef/
-│       ├── __init__.py          # Paketbeschreibung und Version
-│       ├── registry.py       # Modellregister: Schema-Validierung, Versionierung, sha256-Prüfsummen
-│       ├── compatibility.py  # Echtes Sicheres-Laden-Gate: Architektur-Kompatibilität + Checksumme
-│       ├── api.py            # Einfache JSON/HTTP-Oberfläche (stdlib http.server) über das Modellregister
-│       └── main.py           # CLI-Einstiegspunkt (nackter Aufruf + `registry` + `serve`)
-├── tests/               # Echte pytest-Suite (registry, compatibility, api, CLI)
-├── docs/
-│   └── CLI_REFERENCE.md # Vollständige CLI- + JSON/HTTP-API-Referenz, jedes Beispiel aus einem echten Lauf erfasst
-├── build/               # Build-Ausgabe (lokales .venv + künftige HEF-Toolchain-Ausgabe)
-├── images/              # Medien und Diagramme
-├── systemd/
-│   └── hydra-umc-detection-hef.service # systemd-Unit der lokalen CM5-Modellregister-API
-├── tools/
-│   ├── build_test.py    # Nicht-versionierender Build-Check
-│   ├── ci_validate.py   # Manifest/CHANGELOG/Docs-Validierung, von CI genutzt
-│   ├── _doc_policy.py   # Von der Familie geteilte Dokumentationsregeln (Kopie der von HYDRA-UMC-SDK, synchron gehalten)
-│   ├── _readme_parity.py # Prüfung, dass die acht READMEs dieselbe Struktur haben (Kopie der von HYDRA-UMC-SDK, synchron gehalten)
-│   └── hydra_project_tool.py # Dieselben Befehle in jedem Repository: validate, test, ci, version, status, bump
-├── pyproject.toml       # Paketmetadaten, Abhängigkeiten, Kilometerzähler-Version
-├── bump_version.py      # Versionserhöhung im Kilometerzähler-Stil (nur vom expliziten `bump`-Befehl ausgeführt)
-├── bump_manifest_version.py # Synchronisiert die Version von hydra-umc.project.json mit der nativen (--sync)
-├── build.sh / build.bat # venv + editierbare Installation + Compile-Check + Tests
-├── run.sh / run.bat     # Führt den Einstiegspunkt aus dem lokalen venv aus
-└── CHANGELOG.md         # Versions-für-Versions-Historie (Kilometerzähler-Schema, ohne Daten)
-```
-
-Kein `hardware/`-, `firmware/`-, `os/`- oder `models/`-Ordner - siehe "Erweiterte technische Informationen" oben für das Warum. `os/` und `models/` leben nur im Integrations-Elternteil, [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE); das eigene `build/` dieses Projekts ist, wo die Ausgabe seiner HEF-Toolchain landet, bevor sie dort veröffentlicht wird.
-
----
-
-## 🏗️ BUILD UND AUSFÜHRUNG
+## 🚀 Schnellstart
 
 ### Voraussetzungen
 
@@ -211,18 +217,64 @@ build.bat
 run.bat
 ```
 
-### Fehlerbehebung
+## 🧪 Tests
+
+70 automatische Tests laufen mit `python -m pytest tests/ -q`: die Registry, das sichere Ladetor, die Kommandozeile und die HTTP-Schnittstelle. Sie brauchen keine Hailo-Werkzeuge, keine Hardware und kein äußeres Netz.
+
+Die CI führt `HYDRA_UMC_CI=1 python tools/ci_validate.py` aus; das prüft das Manifest, die Dokumente, die acht READMEs und die Bilder.
+
+## 🏗️ Build und Veröffentlichung
+
+Für eine Veröffentlichung gibt es nichts zu kompilieren: `build.sh` / `build.bat` legen die virtuelle Umgebung an, installieren das Paket im editierbaren Modus und führen die Tests aus, `build-test` prüft nur. Bauen ändert nie die Version; sie wird nur von `python tools/hydra_project_tool.py bump` erhöht, das auch das Änderungsprotokoll fortschreibt. Die Version von Paket, Manifest und Änderungsprotokoll muss übereinstimmen, sonst schlägt `ci_validate.py` fehl.
+
+## 🩺 Fehlerbehebung
 
 * **`python`/`python3` nicht gefunden** - Python 3.10+ installieren und sicherstellen, dass es im `PATH` liegt.
 * **`compileall` schlägt fehl** - ein echter Syntaxfehler wurde unter `src/` eingeführt; der Build stoppt absichtlich, ohne die Installation anzufassen.
 * **"No `.venv` found" von `run.sh`/`run.bat`** - `build.sh`/`build.bat` vorher mindestens einmal ausführen.
 * **Veraltete editierbare Installation** - `.venv/` löschen und neu bauen; selten nötig.
 
----
+## 📂 Struktur des Repositorys
 
-## 🚀 Aktueller Status & Nächste Schritte
+<p align="center">
+  <img src="images/repository-structure.svg" alt="Repository structure of HYDRA-UMC-DETECTION-HEF" width="100%">
+</p>
 
-**Was heute funktioniert:** das Modellregister - Schema-Validierung (einschließlich erforderlicher, validierter Hailo-Architektur-Metadaten), Erkennung doppelter Versionen, Suche nach der neuesten Version, und sha256-Integritätsprüfung (`registry.py`) - plus ein echtes, kombiniertes Sicheres-Laden-Gate, das Architektur-Kompatibilität und Checksummen-Integrität zusammen prüft und ein Modell nur dann als bereit meldet, wenn beide bestehen (`compatibility.py`), dieselben Prüfungen zusätzlich als echte, langlebige JSON/HTTP-API (`api.py`, `serve`-Unterbefehl) neben der Einmal-CLI, 70 Tests insgesamt, plus ein echtes, installierbares Python-Paket mit verifiziertem Einstiegspunkt und ein expliziter `bump`-Befehl im Kilometerzähler-Stil, der die Version erhöht (der Build ändert sie nie). Siehe [`CHANGELOG.md`](CHANGELOG.md) für die erfasste Build-/Run-Ausgabe.
+<details>
+<summary>Textversion des Baums</summary>
+
+```text
+HYDRA-UMC-DETECTION-HEF/
+├── src/hydra_umc_detection_hef/
+│   ├── registry.py                              die Registry der kompilierten Modelle
+│   ├── compatibility.py                         das sichere Ladetor für eine .hef
+│   ├── api.py                                   schreibgeschützte HTTP-Schnittstelle
+│   └── main.py                                  Kommandozeile und Start
+├── tests/                                       70 Tests
+├── docs/                                        die Kommandozeilen-Referenz
+├── systemd/                                     Dienst-Unit für den CM5
+├── tools/                                       Build- und Testläufer, Versionserhöhung, CI-Prüfer, README- und Bildgeneratoren samt Prüfungen
+├── images/                                      Banner und die Bilder der README
+├── .github/                                     CI-Workflow und Issue-Vorlagen
+├── pyproject.toml                               Paketmetadaten und Abhängigkeiten
+├── hydra-umc.project.json                       Manifest: Version, Reifegrad, Familie
+├── CHANGELOG.md                                 was sich in jeder Version geändert hat
+├── build.sh build.bat                           Build-Skripte (ändern die Version nie)
+├── build-test.sh build-test.bat                 Build-Skripte (ändern die Version nie)
+├── test.sh test.bat                             führen die Tests aus
+├── Dockerfile                                   Container-Image
+├── bump_version.py / bump_manifest_version.py   ausdrückliche Versionserhöhung
+├── run.sh run.bat                               den Dienst starten
+└── SECURITY.md SUPPORT.md CONTRIBUTING.md CODE_OF_CONDUCT.md LICENSE LICENSE.md
+```
+
+</details>
+
+## 🗺️ Roadmap und bekannte Grenzen
+
+**Bekannte Grenzen heute**
+
+**Was heute funktioniert:** das Modellregister - Schema-Validierung (einschließlich erforderlicher, validierter Hailo-Architektur-Metadaten), Erkennung doppelter Versionen, Suche nach der neuesten Version, und sha256-Integritätsprüfung (`registry.py`) - plus ein echtes, kombiniertes Sicheres-Laden-Gate, das Architektur-Kompatibilität und Checksummen-Integrität zusammen prüft und ein Modell nur dann als bereit meldet, wenn beide bestehen (`compatibility.py`), dieselben Prüfungen zusätzlich als echte, langlebige JSON/HTTP-API (`api.py`, `serve`-Unterbefehl) neben der Einmal-CLI, 70 Tests insgesamt, plus ein echtes, installierbares Python-Paket mit verifiziertem Einstiegspunkt und ein expliziter `bump`-Befehl, der die Version erhöht (der Build ändert sie nie). Siehe [`CHANGELOG.md`](CHANGELOG.md) für die erfasste Build-/Run-Ausgabe.
 
 **Was noch offen ist, ohne bestimmte Reihenfolge, ohne verbindlichen Zeitplan, und blockiert durch echte Hailo-Hardware:**
 
@@ -231,7 +283,9 @@ run.bat
 * Die HAR/HEF-Paketierung, die eine Registerdatei, die das `registry.py` dieses Projekts bereits lesen und validieren kann, tatsächlich befüllen würde.
 * Veröffentlichung kompilierter `.hef`-Ausgaben im `models/`-Ordner von [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE).
 
----
+## 🌍 Sprachen
+
+Diese README und die Dokumente des Repositorys gibt es in acht Sprachen: Englisch, Spanisch, Deutsch, Französisch, Italienisch, Japanisch, Chinesisch und Portugiesisch (Portugal). Sie entstehen gemeinsam, und die CI prüft, dass die acht Dateien dieselben Abschnitte und dieselben Links haben. Dieses Repository hat weder eine eigene Oberfläche noch einen eigenen Meldungskatalog, es gibt also keine Oberflächentexte zu übersetzen.
 
 ## 🔗 Verwandte Projekte
 
@@ -324,20 +378,27 @@ Dieses Projekt ist Teil des HYDRA-UMC-Robotik-Ökosystems desselben Autors (Juan
 - **[HYDRA-UMC-OPS-AGENT](https://github.com/JuanenRac/HYDRA-UMC-OPS-AGENT)** — Wartungsvorfall-Koordinator: eine Edge-Rolle mit niedrigem Privileg sammelt einen bereinigten Inventar-/Gesundheits-Snapshot, eine Control-Plane-Rolle rendert ihn schreibgeschützt und bittet einen KI-Anbieter um einen Diagnosevorschlag - wendet nie einen Patch an und stellt nie etwas bereit.
 - **[HYDRA-UMC-DEV-SERVER](https://github.com/JuanenRac/HYDRA-UMC-DEV-SERVER)** — reproduzierbarer Entwicklungshost (Raspberry Pi 5 / CM5), der den Quellcode des Ökosystems vorhält und begrenzte Build-/Test-Aufgaben über eine dauerhafte Warteschlange ausführt; eine dedizierte Entwicklerrolle, ausdrücklich kein operativer CM5.
 
----
+## 📚 Dokumentation
 
-## 📚 Dokumentation & Community
+Hier steht mehr:
 
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** — Technologie-Stack und Coding-Richtlinien für einen Pull Request.
-- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — die in dieser Community erwarteten Verhaltensstandards.
-- **[SECURITY.md](SECURITY.md)** — wie man eine Schwachstelle meldet, und die echten Sicherheitsschwerpunkte dieses Projekts.
-- **[SUPPORT.md](SUPPORT.md)** — wo man Fragen stellt und Fehler meldet.
-- **[LICENSE.md](LICENSE.md)** — die eigene Lizenz dieses Projekts.
+* [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md) - jeder Befehl und jede Option, die HTTP-Routen und die Exit-Codes
+* [Sicherheitsgrundlage des Ökosystems](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md)
+* [Bedrohungsmodell des Ökosystems](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md)
+* [Änderungsprotokoll dieses Repositorys](CHANGELOG.md)
+* [Lizenz dieses Repositorys](LICENSE.md)
+
+## 🤝 Mitwirken und Community
+
+* Führe vor einem Pull Request `HYDRA_UMC_CI=1 py -3 tools/ci_validate.py` (oder `HYDRA_UMC_CI=1 python3 tools/ci_validate.py`) aus: Es muss `CI_VALIDATION=PASS` ausgeben. Führe dafür nicht `build.sh` oder `build.bat` aus; Bauen ist keine Prüfung.
+* Die acht READMEs entstehen aus einer einzigen Quelle in HYDRA-UMC-DOCS; bearbeite sie nicht von Hand. Ändere die Quelle und schreibe sie mit `tools/make_readmes.py` neu.
+* Behaupte in einer README nichts, was nicht gelaufen ist: Schreibe „simuliert“ oder „nicht auf Hardware erprobt“, wo das stimmt.
+* Siehe [CONTRIBUTING.md](CONTRIBUTING.md), den [Verhaltenskodex](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md) und [SUPPORT.md](SUPPORT.md).
 
 ## 👤 AUTOR
-**JuanenRac** (Electro Hobby 3D)
-📧 electrohobby3d@gmail.com
-📺 [youtube.com/@electrohobby3d](https://youtube.com/@electrohobby3d)
+
+**JuanenRac (Electro Hobby 3D)** · electrohobby3d@gmail.com
 
 ## 📜 LIZENZ
-GPL-3.0-or-later - Siehe LICENSE-Datei für Details.
+
+GPL-3.0-or-later - [LICENSE](LICENSE).

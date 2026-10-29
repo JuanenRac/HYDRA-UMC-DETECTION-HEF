@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+- **README in the universal layout:** the README and its seven translations follow the layout that the four families share (22 sections in a fixed order), with an architecture picture and a repository-structure picture drawn from `docs/architecture.json` and `docs/structure.json`; the CI validator checks both pictures and the file tree. Where the repository has a service or an MQTT transport, the README now says how to start it and which environment variables it reads.
+
+- **The layout of the README is checked in the CI:** the validator runs `tools/universal_readme_check.py` and lists, as a warning, what differs from the universal layout of the README.
+
+(nothing yet)
+
 ## [0.1.5] - Building no longer changes the version; raising it is the explicit `bu
 
 - Building no longer changes the version; raising it is the explicit `bump` command (`python tools/hydra_project_tool.py bump`). The build scripts only report the version they built, and CI fails if a build script runs a bump.
@@ -10,12 +18,6 @@ All notable changes to this project are documented here.
 - The manifest declares the health route of the service (`/stats`), so the service registry, the ecosystem status of the server and the watchdog know where to probe it.
 - The banner follows the animated style of the ecosystem banners, with the name, the kind and the technologies of the project.
 - Added `tools/hydra_project_tool.py`: the same `validate`, `test`, `version`, `status` and `bump` commands in every repository. The checks run with `HYDRA_UMC_CI=1` and fail if the version changes; only `bump` changes it.
-
-## [Unreleased]
-
-- **The layout of the README is checked in the CI:** the validator runs `tools/universal_readme_check.py` and lists, as a warning, what differs from the universal layout of the README.
-
-(nothing yet)
 
 ## [0.1.4]
 
@@ -171,7 +173,7 @@ All notable changes to this project are documented here.
 - 21 tests (`test_registry.py`, `test_cli.py`).
 - `pyproject.toml` - added a `dev` extra (`pytest`).
 - `build.sh`/`build.bat` - fixed the version-bump step ordering (the
-  manifest sync must run after, not before, the odometer bump), added
+  manifest sync must run after, not before, the bump), added
   the real test-suite step, and the no-autoclose-on-double-click
   behavior common to the rest of the ecosystem's scripts.
 - `run.sh`/`run.bat` - now forward CLI arguments through to the entry
@@ -194,7 +196,7 @@ build.
 ## [0.0.1]
 
 Real build verification. `build.sh`/`build.bat` run end-to-end for real:
-odometer bump, `.venv` creation, editable install, `python -m compileall`
+bump, `.venv` creation, editable install, `python -m compileall`
 clean across `src/`. `run.sh`/`run.bat` executed the entry point for real,
 printing name + version + role. No business-logic change - the bump is the
 recorded event.
@@ -204,6 +206,6 @@ recorded event.
 Initial skeleton: `pyproject.toml` (package metadata, no runtime
 dependencies yet), `src/hydra_umc_detection_hef/` (`__init__.py` +
 `main.py` entry point reading its version from installed package
-metadata), `bump_version.py` (odometer-style version bump),
+metadata), `bump_version.py` (version bump),
 `build.sh`/`build.bat` (venv + editable install + compile-check) and
 `run.sh`/`run.bat`.
