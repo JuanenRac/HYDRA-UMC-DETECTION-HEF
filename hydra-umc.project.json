@@ -12,6 +12,7 @@
   ],
   "deployment_target": "cm5",
   "maturity": "functional",
+  "evidence": "none",
   "family": "Vision AI Node",
   "parent": "HYDRA-UMC-VISION-NODE",
   "build": "Requires Hailo runtime/SDK on the real CM5 for the compilation toolchain itself (ONNX export, Dataflow Compiler, HEF packaging); the model registry (registry.py) needs neither.",
