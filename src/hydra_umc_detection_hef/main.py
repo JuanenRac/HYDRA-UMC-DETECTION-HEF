@@ -27,6 +27,7 @@ from .registry import (
     KNOWN_HAILO_ARCHS,
     RegistryError,
     add_entry,
+    classes_sha256,
     duplicate_versions,
     find_latest,
     load_registry,
@@ -163,6 +164,14 @@ def _registry_add_locked(args: argparse.Namespace, registry_path: Path) -> int:
         print(f"error: --input-shape must be comma-separated integers, got {args.input_shape!r}", file=sys.stderr)
         return 1
     classes = tuple(c for c in args.classes.split(",") if c)
+    expected_hash = getattr(args, "classes_sha256", None)
+    if expected_hash and classes_sha256(classes).lower() != expected_hash.strip().lower():
+        print(
+            "error: --classes does not match --classes-sha256 (the dataset's class list); "
+            "the class ids are positions in that list, so the labels or their order differ",
+            file=sys.stderr,
+        )
+        return 1
 
     try:
         new_entry = add_entry(
@@ -249,6 +258,10 @@ def _build_parser() -> argparse.ArgumentParser:
     add.add_argument("--task", required=True, help="Task this model performs (e.g. detection, pose)")
     add.add_argument("--input-shape", required=True, help="Height,width,channels (HWC) with 1, 3 or 4 channels, e.g. 640,640,3")
     add.add_argument("--classes", required=True, help="Comma-separated class labels, e.g. defect,ok")
+    add.add_argument(
+        "--classes-sha256", default=None,
+        help="Optional sha256 of the dataset's class list (classes_sha256 of its manifest); when given, --classes must hash to it",
+    )
     add.add_argument(
         "--hailo-arch", required=True, help=f"Target Hailo architecture ({', '.join(sorted(KNOWN_HAILO_ARCHS))})"
     )

@@ -133,6 +133,12 @@ def validate_io_contract(contract: object) -> list[str]:
     return problems
 
 
+def classes_sha256(classes: tuple[str, ...] | list[str]) -> str:
+    """sha256 of the class list written as a classes.txt file: one label a line and a final newline. A dataset
+    generator that publishes this hash lets `registry add` prove that the labels it is given are the dataset's."""
+    return hashlib.sha256(("\n".join(classes) + "\n").encode("utf-8")).hexdigest()
+
+
 def io_contract_sha256(contract: dict) -> str:
     """sha256 of the contract as canonical JSON (sorted keys, no spaces), so two registries that spell it differently
     but mean the same thing give the same hash."""

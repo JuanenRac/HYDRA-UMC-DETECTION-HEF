@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **`registry add --classes-sha256`:** an optional check that the labels given are the class list of the dataset the model was trained on (the hash that the synthetic dataset manifest publishes); a different label or order is refused before the registry is written.
 - **`docs/COMPILING_A_HEF.md`:** the manual steps for compiling a HEF with Hailo's Dataflow Compiler (parse, optimize with a calibration set, compile) and registering it with `registry add`, and a note that the script that automates them waits for a Dataflow Compiler licence.
 - **`input_shape` must be height, width, channels:** a registry entry whose input shape is not three numbers with 1, 3 or 4 channels is rejected with an error when the registry loads (and by `registry add`).
 

@@ -291,6 +291,7 @@ usage: hydra-umc-detection-hef registry add [-h] --registry REGISTRY
                                             --version VERSION --task TASK
                                             --input-shape INPUT_SHAPE
                                             --classes CLASSES
+                                            [--classes-sha256 CLASSES_SHA256]
                                             --hailo-arch HAILO_ARCH
 
 options:
@@ -307,6 +308,10 @@ options:
                         Height,width,channels (HWC) with 1, 3 or 4 channels,
                         e.g. 640,640,3
   --classes CLASSES     Comma-separated class labels, e.g. defect,ok
+  --classes-sha256 CLASSES_SHA256
+                        Optional sha256 of the dataset's class list
+                        (classes_sha256 of its manifest); when given,
+                        --classes must hash to it
   --hailo-arch HAILO_ARCH
                         Target Hailo architecture (hailo10h, hailo15h,
                         hailo15l, hailo15m, hailo8, hailo8l, hailo8r)
@@ -345,6 +350,12 @@ error: entry for 'pcb-defect' '0.1.0' already exists in the registry
 $ echo $?
 1
 ```
+
+With `--classes-sha256` (the `classes_sha256` that the manifest of the
+synthetic dataset publishes: sha256 of the class list written one label a line
+with a final newline) the labels are checked against the dataset's list before
+anything is written; a different label or order is an error, because the class
+ids are positions in that list.
 
 A `--hef-path` that isn't a real, present file is rejected before any
 JSON is written - there is no path where `registry add` records a

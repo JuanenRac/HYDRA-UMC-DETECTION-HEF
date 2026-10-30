@@ -169,3 +169,28 @@ def test_registry_load_accepts_the_architecture_as_hailortcli_prints_it(tmp_path
     result = run_cli("registry", "load", "--registry", str(reg_path), "--models-dir", str(tmp_path), "--name", "pcb-defect", "--target-arch", "HAILO8")
     assert result.returncode == 0, result.stderr
     assert "READY" in result.stdout
+
+
+def _add_args(tmp_path, classes, extra=()):
+    models = tmp_path / "models"
+    models.mkdir(exist_ok=True)
+    (models / "m.hef").write_bytes(b"hef-bytes")
+    return run_cli(
+        "registry", "add", "--registry", str(tmp_path / "reg.json"), "--models-dir", str(models),
+        "--hef-path", "m.hef", "--name", "m", "--version", "0.1.0", "--task", "detection",
+        "--input-shape", "64,64,3", "--classes", classes, "--hailo-arch", "hailo8", *extra,
+    )
+
+
+def test_registry_add_accepts_the_class_list_hash_of_the_dataset(tmp_path):
+    digest = hashlib.sha256(b"a\nb\n").hexdigest()
+    result = _add_args(tmp_path, "a,b", ("--classes-sha256", digest))
+    assert result.returncode == 0, result.stderr
+
+
+def test_registry_add_refuses_classes_that_differ_from_the_dataset_hash(tmp_path):
+    digest = hashlib.sha256(b"a\nb\n").hexdigest()
+    result = _add_args(tmp_path, "b,a", ("--classes-sha256", digest))
+    assert result.returncode == 1
+    assert "classes-sha256" in result.stderr
+    assert not (tmp_path / "reg.json").exists()
