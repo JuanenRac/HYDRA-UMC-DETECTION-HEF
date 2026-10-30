@@ -356,7 +356,7 @@ $ echo $?
 1
 ```
 
-### `serve --registry PATH [--models-dir PATH] [--addr ADDR] [--port PORT]`
+### `serve --registry PATH [--models-dir PATH] [--addr ADDR] [--port PORT] [--stats-full-paths]`
 
 Runs the same `registry.py`/`compatibility.py` logic the three `registry`
 subcommands above use, but as a long-running JSON/HTTP API
@@ -405,7 +405,8 @@ $ curl -s http://127.0.0.1:8093/registry/load?name=pcb-defect&target_arch=hailo8
 ```
 
 `GET /stats` — which registry/models-dir this server instance is
-configured with:
+configured with (file names only; `serve --stats-full-paths` shows the
+absolute paths):
 
 ```
 $ curl -s http://127.0.0.1:8093/stats

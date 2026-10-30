@@ -86,9 +86,12 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/registry/load":
             self._handle_load(params)
         elif path == "/stats":
+            # File names only unless the server was started with --stats-full-paths: absolute paths tell a caller
+            # where the host keeps its models.
+            shown = (lambda p: str(p)) if self.server.show_paths else (lambda p: p.name or str(p))
             _write_json(self, 200, {
-                "registry": str(self.server.registry_path),
-                "modelsDir": str(self.server.models_dir) if self.server.models_dir else None,
+                "registry": shown(self.server.registry_path),
+                "modelsDir": shown(self.server.models_dir) if self.server.models_dir else None,
             })
         else:
             _write_error(self, 404, "not found")
@@ -161,7 +164,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class RegistryServer(ThreadingHTTPServer):
-    def __init__(self, address: tuple[str, int], registry_path: Path, models_dir: Path | None) -> None:
+    def __init__(
+        self, address: tuple[str, int], registry_path: Path, models_dir: Path | None, show_paths: bool = False
+    ) -> None:
         super().__init__(address, Handler)
         self.registry_path = registry_path
         self.models_dir = models_dir
+        self.show_paths = show_paths

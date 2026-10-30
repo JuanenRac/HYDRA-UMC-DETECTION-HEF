@@ -166,7 +166,22 @@ def test_stats(tmp_path) -> None:
     with running_server(reg_path) as base:
         status, body = _get(f"{base}/stats")
         assert status == 200
-        assert body["registry"] == str(reg_path)
+        assert body["registry"] == "registry.json"
+
+
+def test_stats_shows_full_paths_only_when_asked(tmp_path) -> None:
+    reg_path = tmp_path / "registry.json"
+    _write_registry(reg_path, [_entry()])
+    server = RegistryServer(("127.0.0.1", 0), reg_path, tmp_path, show_paths=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        status, body = _get(f"http://127.0.0.1:{server.server_address[1]}/stats")
+        assert status == 200
+        assert body == {"registry": str(reg_path), "modelsDir": str(tmp_path)}
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def test_not_found(tmp_path) -> None:

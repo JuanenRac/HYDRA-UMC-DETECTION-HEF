@@ -193,7 +193,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         print(f"[detection-hef] warning: {registry_path} is a directory, not a registry file (a bind mount of a missing file does this)", file=sys.stderr)
     elif not registry_path.is_file():
         print(f"[detection-hef] warning: registry {registry_path} does not exist - every query will answer 502", file=sys.stderr)
-    server = RegistryServer((args.addr, args.port), Path(args.registry), models_dir)
+    server = RegistryServer((args.addr, args.port), Path(args.registry), models_dir, show_paths=args.stats_full_paths)
     print(f"[detection-hef] HTTP API listening on {args.addr}:{args.port} (registry={args.registry})")
     print("[detection-hef] GET /registry, GET /registry/latest, GET /registry/load, GET /stats")
     try:
@@ -264,6 +264,7 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--models-dir", default=None, help="Directory containing the .hef files, needed for GET /registry/load")
     serve.add_argument("--addr", default="127.0.0.1", help="address to bind the HTTP API to")
     serve.add_argument("--port", type=int, default=8093, help="port for the HTTP API")
+    serve.add_argument("--stats-full-paths", action="store_true", help="let GET /stats show absolute paths instead of file names")
     serve.set_defaults(func=_cmd_serve)
 
     return parser
