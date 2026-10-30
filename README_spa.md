@@ -130,6 +130,8 @@ El diagrama de arriba ya fija la forma prevista del pipeline: el entrenamiento P
 
 **Lo que nunca hace:** no compila nada ni ejecuta ningún modelo: solo guarda y comprueba el registro de ficheros compilados.
 
+`GET /stats` muestra nombres de fichero, no rutas absolutas, de modo que quien consulta no averigua dónde guarda el equipo su registro y sus modelos; `serve --stats-full-paths` vuelve a mostrar las rutas completas.
+
 ## 🔌 Interfaces
 
 HTTP en `127.0.0.1:8093` por defecto (solo lectura) y una línea de órdenes. La referencia completa es `docs/CLI_REFERENCE.md`.

@@ -130,6 +130,8 @@ The diagram above already fixes the intended pipeline shape: PyTorch/YOLO traini
 
 **What it never does:** it compiles nothing and runs no model: it only keeps and checks the registry of compiled files.
 
+`GET /stats` shows file names, not absolute paths, so a caller does not learn where the host keeps its registry and models; `serve --stats-full-paths` shows the full paths again.
+
 ## 🔌 Interfaces
 
 HTTP on `127.0.0.1:8093` by default (read only) and a command line. The full reference is `docs/CLI_REFERENCE.md`.

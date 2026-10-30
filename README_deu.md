@@ -130,6 +130,8 @@ Das obige Diagramm legt die geplante Pipeline-Form bereits fest: PyTorch/YOLO-Tr
 
 **Was er nie tut:** er kompiliert nichts und führt kein Modell aus: Er hält und prüft nur die Registry kompilierter Dateien.
 
+`GET /stats` zeigt Dateinamen statt absoluter Pfade, sodass ein Aufrufer nicht erfährt, wo der Host sein Register und seine Modelle ablegt; `serve --stats-full-paths` zeigt wieder die vollständigen Pfade.
+
 ## 🔌 Schnittstellen
 
 HTTP standardmäßig auf `127.0.0.1:8093` (schreibgeschützt) und eine Kommandozeile. Die vollständige Referenz ist `docs/CLI_REFERENCE.md`.

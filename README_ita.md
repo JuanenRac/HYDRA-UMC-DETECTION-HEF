@@ -130,6 +130,8 @@ Il diagramma sopra fissa già la forma prevista della pipeline: l'addestramento 
 
 **Cosa non fa mai:** non compila nulla né esegue alcun modello: conserva e controlla soltanto il registro dei file compilati.
 
+`GET /stats` mostra nomi di file e non percorsi assoluti, così chi chiama non scopre dove l'host tiene il suo registro e i suoi modelli; `serve --stats-full-paths` mostra di nuovo i percorsi completi.
+
 ## 🔌 Interfacce
 
 HTTP su `127.0.0.1:8093` per impostazione predefinita (sola lettura) e una riga di comando. Il riferimento completo è `docs/CLI_REFERENCE.md`.

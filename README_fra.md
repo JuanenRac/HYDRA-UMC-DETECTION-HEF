@@ -130,6 +130,8 @@ Le diagramme ci-dessus fixe déjà la forme prévue du pipeline : l'entraînemen
 
 **Ce qu'il ne fait jamais :** il ne compile rien et n'exécute aucun modèle : il ne fait que garder et vérifier le registre des fichiers compilés.
 
+`GET /stats` affiche des noms de fichier et non des chemins absolus, de sorte qu'un appelant n'apprend pas où l'hôte garde son registre et ses modèles ; `serve --stats-full-paths` affiche de nouveau les chemins complets.
+
 ## 🔌 Interfaces
 
 HTTP sur `127.0.0.1:8093` par défaut (lecture seule) et une ligne de commande. La référence complète est `docs/CLI_REFERENCE.md`.

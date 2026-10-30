@@ -130,6 +130,8 @@ Compilar um modelo (ONNX, depois o Hailo Dataflow Compiler e por fim um `.hef`) 
 
 **O que nunca faz:** não compila nada nem executa nenhum modelo: só guarda e verifica o registo de ficheiros compilados.
 
+`GET /stats` mostra nomes de ficheiro e não caminhos absolutos, pelo que quem consulta não fica a saber onde o anfitrião guarda o seu registo e os seus modelos; `serve --stats-full-paths` volta a mostrar os caminhos completos.
+
 ## 🔌 Interfaces
 
 HTTP em `127.0.0.1:8093` por predefinição (só leitura) e uma linha de comandos. A referência completa é `docs/CLI_REFERENCE.md`.
