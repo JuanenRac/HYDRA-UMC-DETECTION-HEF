@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.6] - File names instead of paths in the statistics, an optional io contract and the verified bytes of a model
+
 - **`GET /stats` shows file names, not absolute paths:** a caller no longer learns where the host keeps its registry and models; `serve --stats-full-paths` brings the full paths back.
 - **Optional `io_contract` on a registry entry:** how to feed the model (layout, colour order, dtype, normalisation, letterbox or stretch, pad value) and how to read its output (NMS format, box order, normalised boxes, thresholds). It is validated when the registry loads, kept when the registry is rewritten, and `model_identity()` adds `io_contract_sha256` when the entry has one. An entry without the block loads as before; the contract is documented in the CLI reference.
 - **`safe_load(..., keep_bytes=True)` returns the verified bytes:** the file is read once, hashed and kept in `LoadResult.data`, so a consumer that builds the model from those bytes cannot be handed a file that changed (or a symlink that was repointed) between the check and the use. The default call and the HTTP/CLI output are unchanged; `registry.read_verified` is the same single read for other callers.
