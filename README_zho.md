@@ -121,6 +121,8 @@ INT8/INT4 量化（生成 `.har`），最后打包为 [HYDRA-UMC-VISION-NODE](ht
 * ⚡ **量化性能（计划中）：** 针对 Hailo-8/Hailo-10 NPU 的 INT8/INT4 变体，实现亚 10ms 推理。*（未来工作——需要本环境尚不具备的真实 Hailo-8/Hailo-10 NPU 和 Dataflow Compiler。）*
 * 🤖 **姿态估计（计划中）：** 用于机械臂关节跟踪的关键点检测。*（未来工作，原因相同。）*
 * 🧩 **为何作为独立项目存在：** 编译和管理模型版本是一项数据/机器学习工作流，与提供服务的运行时进程完全不同——将工具链保持在此处，意味着一次糟糕的编译永远不会危及正在运行的感知节点，模型可以在到达 [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE) 之前离线迭代和验证。
+* 📐 **输入输出约定(可选):** 注册表条目可以带一个 `io_contract`，说明如何向模型输入数据(布局、颜色顺序、数据类型、归一化、缩放或 letterbox、填充值)以及如何读取其输出(NMS 格式、框的顺序、是否归一化、阈值)。注册表加载时会校验它，重写注册表时会保留它，它的校验和也是模型标识的一部分。没有它的条目仍按原来的方式加载。
+* 🔐 **已验证的字节:** `safe_load(..., keep_bytes=True)` 只读取文件一次，检查其 SHA-256，并原样返回这些字节；因此用这些字节构建模型的使用方(视觉推流器和视觉伺服 API 就是这样做的)不会拿到校验之后又被改动的文件。`GET /stats` 只显示文件名而不是绝对路径，除非加上 `serve --stats-full-paths`。
 
 **诚实说明——今天实际运行的内容：** 本项目工作中真实、独立于硬件的那一半——模型注册表（`registry.py`）和真实的安全加载关卡（`compatibility.py`）——通过 `registry validate`/`registry latest`/`registry load`，以及作为长期运行 JSON/HTTP API 的 `serve`（`api.py`）暴露，已经实现并经过测试（93 个测试）。而真正*生产*这些注册表所描述模型的 ONNX 导出、Hailo Dataflow Compiler 量化和 HAR/HEF 打包步骤仍是未来工作：它们都需要本环境不具备的真实 Hailo 硬件。具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，尚待完成的
 内容请参见下方"当前状态与后续步骤"章节。
