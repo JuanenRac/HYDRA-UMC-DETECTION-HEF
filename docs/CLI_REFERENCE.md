@@ -304,7 +304,8 @@ options:
   --version VERSION     Model version, X.Y.Z
   --task TASK           Task this model performs (e.g. detection, pose)
   --input-shape INPUT_SHAPE
-                        Comma-separated positive integers, e.g. 640,640,3
+                        Height,width,channels (HWC) with 1, 3 or 4 channels,
+                        e.g. 640,640,3
   --classes CLASSES     Comma-separated class labels, e.g. defect,ok
   --hailo-arch HAILO_ARCH
                         Target Hailo architecture (hailo10h, hailo15h,

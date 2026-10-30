@@ -247,7 +247,7 @@ def _build_parser() -> argparse.ArgumentParser:
     add.add_argument("--name", required=True, help="Model name")
     add.add_argument("--version", required=True, help="Model version, X.Y.Z")
     add.add_argument("--task", required=True, help="Task this model performs (e.g. detection, pose)")
-    add.add_argument("--input-shape", required=True, help="Comma-separated positive integers, e.g. 640,640,3")
+    add.add_argument("--input-shape", required=True, help="Height,width,channels (HWC) with 1, 3 or 4 channels, e.g. 640,640,3")
     add.add_argument("--classes", required=True, help="Comma-separated class labels, e.g. defect,ok")
     add.add_argument(
         "--hailo-arch", required=True, help=f"Target Hailo architecture ({', '.join(sorted(KNOWN_HAILO_ARCHS))})"

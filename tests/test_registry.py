@@ -80,6 +80,25 @@ def test_load_registry_rejects_a_boolean_input_shape_dimension(tmp_path):
         load_registry(reg_path)
 
 
+@pytest.mark.parametrize("shape", [[640, 640], [3, 640, 640, 1], [640, 640, 2], [640, 640, 5], [3, 640, 640]])
+def test_load_registry_rejects_input_shape_that_is_not_hwc(tmp_path, shape):
+    reg_path = tmp_path / "registry.json"
+    bad = _entry()
+    bad["input_shape"] = shape
+    _write_registry(reg_path, [bad])
+    with pytest.raises(RegistryError, match="HWC"):
+        load_registry(reg_path)
+
+
+@pytest.mark.parametrize("channels", [1, 3, 4])
+def test_load_registry_accepts_one_three_or_four_channels(tmp_path, channels):
+    reg_path = tmp_path / "registry.json"
+    ok = _entry()
+    ok["input_shape"] = [224, 224, channels]
+    _write_registry(reg_path, [ok])
+    assert load_registry(reg_path)
+
+
 def test_load_registry_unknown_hailo_arch(tmp_path):
     reg_path = tmp_path / "registry.json"
     _write_registry(reg_path, [_entry(hailo_arch="hailo9-doesnt-exist")])

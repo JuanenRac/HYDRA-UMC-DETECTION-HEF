@@ -164,6 +164,12 @@ def _parse_entry(raw: object, index: int) -> ModelEntry:
     # actually is.
     if not input_shape or any(isinstance(d, bool) or not isinstance(d, int) or d <= 0 for d in input_shape):
         raise RegistryError(f"entry {index}: input_shape must be non-empty positive integers")
+    # The input is an image in HWC order: height, width, channels,
+    # with 1 (grey), 3 (colour) or 4 (colour with alpha) channels.
+    if len(input_shape) != 3 or input_shape[2] not in (1, 3, 4):
+        raise RegistryError(
+            f"entry {index}: input_shape must be height, width, channels (HWC) with 1, 3 or 4 channels, got {list(input_shape)}"
+        )
 
     if not isinstance(raw["classes"], list):
         raise RegistryError(f"entry {index}: classes must be an array")

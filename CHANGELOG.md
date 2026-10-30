@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **`input_shape` must be height, width, channels:** a registry entry whose input shape is not three numbers with 1, 3 or 4 channels is rejected with an error when the registry loads (and by `registry add`).
+
 ## [0.1.6] - File names instead of paths in the statistics, an optional io contract and the verified bytes of a model
 
 - **`GET /stats` shows file names, not absolute paths:** a caller no longer learns where the host keeps its registry and models; `serve --stats-full-paths` brings the full paths back.
