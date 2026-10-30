@@ -3,8 +3,8 @@
 All notable changes to this project are documented here.
 
 ## [Unreleased]
-- **`docs/COMPILING_A_HEF.md`:** the manual steps for compiling a HEF with Hailo's Dataflow Compiler (parse, optimize with a calibration set, compile) and registering it with `registry add`, and a note that the script that automates them waits for a Dataflow Compiler licence.
 
+- **`docs/COMPILING_A_HEF.md`:** the manual steps for compiling a HEF with Hailo's Dataflow Compiler (parse, optimize with a calibration set, compile) and registering it with `registry add`, and a note that the script that automates them waits for a Dataflow Compiler licence.
 - **`input_shape` must be height, width, channels:** a registry entry whose input shape is not three numbers with 1, 3 or 4 channels is rejected with an error when the registry loads (and by `registry add`).
 
 ## [0.1.6] - File names instead of paths in the statistics, an optional io contract and the verified bytes of a model
