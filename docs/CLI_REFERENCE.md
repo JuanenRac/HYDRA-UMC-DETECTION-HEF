@@ -11,7 +11,7 @@ ever reporting a model ready to deploy — reachable both as one-shot
 API (`api.py`) exposing the same checks over `GET /registry`,
 `GET /registry/latest`, `GET /registry/load`, and `GET /stats`. ONNX
 export and Hailo Dataflow Compiler quantization need real Hailo
-hardware/SDK and are not built yet. Every example below was captured
+hardware/SDK and are not built yet (the manual steps are in `COMPILING_A_HEF.md`). Every example below was captured
 from a real run of the installed CLI, against a real registry JSON file
 and real `.hef`-shaped fixture files (with real sha256 digests) — not
 written from memory.

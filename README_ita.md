@@ -283,7 +283,7 @@ HYDRA-UMC-DETECTION-HEF/
 **Cosa resta aperto, senza ordine particolare, senza calendario impegnato, e bloccato da vero hardware Hailo:**
 
 * La vera esportazione ONNX da modelli PyTorch/YOLO addestrati.
-* L'integrazione con il Hailo Dataflow Compiler per la quantizzazione INT8/INT4.
+* L'integrazione con il Hailo Dataflow Compiler per la quantizzazione INT8/INT4. I passaggi manuali sono descritti in [`docs/COMPILING_A_HEF.md`](docs/COMPILING_A_HEF.md); lo script che li automatizza attende una licenza del Dataflow Compiler.
 * Il pacchettizzazione HAR/HEF che popolerebbe davvero un file di registro che il `registry.py` di questo progetto sa già leggere e validare.
 * Pubblicare l'output `.hef` compilato nella cartella `models/` di [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE).
 
