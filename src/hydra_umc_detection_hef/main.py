@@ -36,6 +36,7 @@ from .registry import (
     verify_checksum,
     write_registry,
 )
+from .signing import generate_keypair, resolve_public_key, sign_registry
 
 PROJECT_NAME = "HYDRA-UMC-DETECTION-HEF"
 DIST_NAME = "hydra-umc-detection-hef"
@@ -61,7 +62,7 @@ def get_version() -> str:
 
 def _cmd_registry_validate(args: argparse.Namespace) -> int:
     try:
-        entries = load_registry(Path(args.registry))
+        entries = load_registry(Path(args.registry), resolve_public_key(getattr(args, "public_key", None)))
     except RegistryError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -95,7 +96,7 @@ def _cmd_registry_validate(args: argparse.Namespace) -> int:
 
 def _cmd_registry_latest(args: argparse.Namespace) -> int:
     try:
-        entries = load_registry(Path(args.registry))
+        entries = load_registry(Path(args.registry), resolve_public_key(getattr(args, "public_key", None)))
     except RegistryError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -114,7 +115,7 @@ def _cmd_registry_latest(args: argparse.Namespace) -> int:
 
 def _cmd_registry_load(args: argparse.Namespace) -> int:
     try:
-        entries = load_registry(Path(args.registry))
+        entries = load_registry(Path(args.registry), resolve_public_key(getattr(args, "public_key", None)))
     except RegistryError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -195,6 +196,40 @@ def _registry_add_locked(args: argparse.Namespace, registry_path: Path) -> int:
     return 0
 
 
+def _cmd_registry_keygen(args: argparse.Namespace) -> int:
+    try:
+        generate_keypair(Path(args.private_key_out), Path(args.public_key_out))
+    except RegistryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(f"wrote the private key to {args.private_key_out} (keep it off the nodes) and the public key to {args.public_key_out}")
+    return 0
+
+
+def _cmd_registry_sign(args: argparse.Namespace) -> int:
+    try:
+        target = sign_registry(Path(args.registry), Path(args.private_key))
+    except RegistryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(f"signed {args.registry} -> {target}")
+    return 0
+
+
+def _cmd_registry_verify(args: argparse.Namespace) -> int:
+    key = resolve_public_key(args.public_key)
+    if key is None:
+        print("error: give --public-key (or set HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE)", file=sys.stderr)
+        return 1
+    try:
+        entries = load_registry(Path(args.registry), key)
+    except RegistryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(f"signature OK ({len(entries)} entr{'y' if len(entries) == 1 else 'ies'})")
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     models_dir = Path(args.models_dir) if args.models_dir else None
     registry_path = Path(args.registry)
@@ -202,7 +237,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         print(f"[detection-hef] warning: {registry_path} is a directory, not a registry file (a bind mount of a missing file does this)", file=sys.stderr)
     elif not registry_path.is_file():
         print(f"[detection-hef] warning: registry {registry_path} does not exist - every query will answer 502", file=sys.stderr)
-    server = RegistryServer((args.addr, args.port), Path(args.registry), models_dir, show_paths=args.stats_full_paths)
+    server = RegistryServer((args.addr, args.port), Path(args.registry), models_dir, show_paths=args.stats_full_paths,
+                            public_key_file=resolve_public_key(args.public_key))
     print(f"[detection-hef] HTTP API listening on {args.addr}:{args.port} (registry={args.registry})")
     print("[detection-hef] GET /registry, GET /registry/latest, GET /registry/load, GET /stats")
     try:
@@ -225,12 +261,14 @@ def _build_parser() -> argparse.ArgumentParser:
     validate = registry_sub.add_parser("validate", help="Validate registry structure and (optionally) checksums.")
     validate.add_argument("--registry", required=True, help="Path to the registry JSON file")
     validate.add_argument("--models-dir", default=None, help="Directory to verify .hef checksums against, if present")
+    validate.add_argument("--public-key", default=None, help="Ed25519 public key file; when set (or in HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE) the registry must carry a valid <registry>.sig")
     validate.set_defaults(func=_cmd_registry_validate)
 
     latest = registry_sub.add_parser("latest", help="Print the latest registered version of a model.")
     latest.add_argument("--registry", required=True, help="Path to the registry JSON file")
     latest.add_argument("--name", required=True, help="Model name to look up")
     latest.add_argument("--task", default=None, help="Restrict to this task (e.g. detection, pose)")
+    latest.add_argument("--public-key", default=None, help="Ed25519 public key file; when set (or in HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE) the registry must carry a valid <registry>.sig")
     latest.set_defaults(func=_cmd_registry_latest)
 
     load = registry_sub.add_parser(
@@ -244,6 +282,7 @@ def _build_parser() -> argparse.ArgumentParser:
     load.add_argument(
         "--target-arch", required=True, help="Hailo architecture of this deployment (e.g. hailo8)"
     )
+    load.add_argument("--public-key", default=None, help="Ed25519 public key file; when set (or in HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE) the registry must carry a valid <registry>.sig")
     load.set_defaults(func=_cmd_registry_load)
 
     add = registry_sub.add_parser(
@@ -267,6 +306,21 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     add.set_defaults(func=_cmd_registry_add)
 
+    keygen = registry_sub.add_parser("keygen", help="Create an Ed25519 key pair to sign registries (needs 'cryptography').")
+    keygen.add_argument("--private-key-out", required=True, help="Where to write the private key (refuses to overwrite)")
+    keygen.add_argument("--public-key-out", required=True, help="Where to write the public key (refuses to overwrite)")
+    keygen.set_defaults(func=_cmd_registry_keygen)
+
+    sign = registry_sub.add_parser("sign", help="Write <registry>.sig, the Ed25519 signature of the registry file.")
+    sign.add_argument("--registry", required=True, help="Path to the registry JSON file")
+    sign.add_argument("--private-key", required=True, help="Private key file (32 bytes, raw or 64 hex digits)")
+    sign.set_defaults(func=_cmd_registry_sign)
+
+    verify = registry_sub.add_parser("verify", help="Check <registry>.sig against the public key.")
+    verify.add_argument("--registry", required=True, help="Path to the registry JSON file")
+    verify.add_argument("--public-key", default=None, help="Ed25519 public key file; when set (or in HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE) the registry must carry a valid <registry>.sig")
+    verify.set_defaults(func=_cmd_registry_verify)
+
     serve = subparsers.add_parser(
         "serve",
         help="Run the registry validate/latest/load queries as a JSON/HTTP API "
@@ -278,6 +332,7 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--addr", default="127.0.0.1", help="address to bind the HTTP API to")
     serve.add_argument("--port", type=int, default=8093, help="port for the HTTP API")
     serve.add_argument("--stats-full-paths", action="store_true", help="let GET /stats show absolute paths instead of file names")
+    serve.add_argument("--public-key", default=None, help="Ed25519 public key file; when set (or in HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE) the registry must carry a valid <registry>.sig")
     serve.set_defaults(func=_cmd_serve)
 
     return parser

@@ -66,7 +66,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _load_registry(self):
         try:
-            return load_registry(self.server.registry_path), None
+            return load_registry(self.server.registry_path, self.server.public_key_file), None
         except RegistryError as e:
             _write_error(self, 502, f"could not read registry: {e}")
             return None, "handled"
@@ -165,9 +165,11 @@ class Handler(BaseHTTPRequestHandler):
 
 class RegistryServer(ThreadingHTTPServer):
     def __init__(
-        self, address: tuple[str, int], registry_path: Path, models_dir: Path | None, show_paths: bool = False
+        self, address: tuple[str, int], registry_path: Path, models_dir: Path | None, show_paths: bool = False,
+        public_key_file: Path | None = None,
     ) -> None:
         super().__init__(address, Handler)
         self.registry_path = registry_path
         self.models_dir = models_dir
         self.show_paths = show_paths
+        self.public_key_file = public_key_file

@@ -13,7 +13,9 @@ authors = [{ name = "JuanenRac", email = "electrohobby3d@gmail.com" }]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "cryptography>=42"]
+# Only needed to sign a registry or to check its signature (registry keygen / sign / verify, --public-key).
+signing = ["cryptography>=42"]
 
 [project.scripts]
 hydra-umc-detection-hef = "hydra_umc_detection_hef.main:main"

@@ -215,11 +215,22 @@ def _parse_entry(raw: object, index: int) -> ModelEntry:
     )
 
 
-def load_registry(path: Path) -> list[ModelEntry]:
-    """Parse a registry JSON file: a top-level list of model entries."""
+def load_registry(path: Path, public_key_file: Path | None = None) -> list[ModelEntry]:
+    """Parse a registry JSON file: a top-level list of model entries.
+
+    With `public_key_file` the signature next to the registry (`<registry>.sig`, see signing.py) must be a valid
+    Ed25519 signature of exactly the bytes that are parsed here; without it the registry is read as before."""
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        data = path.read_bytes()
+    except OSError as exc:
+        raise RegistryError(f"could not read registry {path}: {exc}") from exc
+    if public_key_file is not None:
+        from .signing import verify_registry_bytes
+
+        verify_registry_bytes(data, path, public_key_file)
+    try:
+        raw = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise RegistryError(f"could not read registry {path}: {exc}") from exc
     if not isinstance(raw, list):
         raise RegistryError(f"registry {path} must be a JSON array of entries")

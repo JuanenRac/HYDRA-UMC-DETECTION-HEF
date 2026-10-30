@@ -357,6 +357,26 @@ with a final newline) the labels are checked against the dataset's list before
 anything is written; a different label or order is an error, because the class
 ids are positions in that list.
 
+### Signing the registry: `registry keygen`, `registry sign`, `registry verify` and `--public-key`
+
+Whoever can edit `registry.json` can change which model a node loads and which checksum it expects. A detached Ed25519
+signature closes that: the private key stays on the machine that builds models, the node only holds the public key.
+It needs the optional `cryptography` package (`pip install "hydra-umc-detection-hef[signing]"`); nothing else does.
+
+```
+$ hydra-umc-detection-hef registry keygen --private-key-out registry.key --public-key-out registry.pub
+$ hydra-umc-detection-hef registry sign --registry registry.json --private-key registry.key     # writes registry.json.sig
+$ hydra-umc-detection-hef registry verify --registry registry.json --public-key registry.pub
+signature OK (1 entry)
+```
+
+`validate`, `latest`, `load` and `serve` take `--public-key FILE` (or read `HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE`).
+While it is set, a registry without `registry.json.sig`, or whose bytes changed after signing, or that was signed with
+another key, is an error (the HTTP API answers 502); with no key set the registry is read as before. The signature covers
+the exact bytes that are parsed, so a registry cannot change between the check and the use. A key file holds 32 bytes, raw
+or as 64 hexadecimal digits; `keygen` refuses to overwrite a key and creates the private file readable by its owner only.
+`registry add` rewrites the file, so sign again after it.
+
 A `--hef-path` that isn't a real, present file is rejected before any
 JSON is written - there is no path where `registry add` records a
 checksum for a file that was never actually read:
