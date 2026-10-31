@@ -15,6 +15,8 @@ consumer that picks the right entry off it at deploy time.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import contextlib
 import hashlib
 import json
@@ -107,7 +109,7 @@ def validate_io_contract(contract: object) -> list[str]:
         for key in ("bbox_normalized", "nms_on_chip"):
             if key in block and not isinstance(block[key], bool):
                 problems.append(f"io_contract.{part}.{key} must be true or false")
-    inp = contract.get("input") if isinstance(contract.get("input"), dict) else {}
+    inp: Any = contract.get("input") if isinstance(contract.get("input"), dict) else {}
     norm = inp.get("normalization")
     if "normalization" in inp and norm != "on-chip":
         if not (isinstance(norm, dict) and set(norm) == {"mean", "std"}):
@@ -123,7 +125,7 @@ def validate_io_contract(contract: object) -> list[str]:
     pad = inp.get("pad_value")
     if "pad_value" in inp and not (isinstance(pad, int) and not isinstance(pad, bool) and 0 <= pad <= 255):
         problems.append("io_contract.input.pad_value must be an integer in 0..255")
-    out = contract.get("output") if isinstance(contract.get("output"), dict) else {}
+    out: Any = contract.get("output") if isinstance(contract.get("output"), dict) else {}
     for key in ("score_threshold", "iou_threshold"):
         if key in out and not (_is_number(out[key]) and 0.0 <= out[key] <= 1.0):
             problems.append(f"io_contract.output.{key} must be a number in 0..1")
