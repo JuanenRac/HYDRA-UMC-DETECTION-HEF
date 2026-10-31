@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.7] - A reference decoder, a signed registry, the classes hash of a registry entry, a guide to compile a HEF and the input shape as height, width and channels
+
 - **Reference decoder** (`decoder.py`, pure Python): `decode_nms_by_class()` turns the NMS-by-class output of a Hailo model into detections in the pixels of the original frame, undoing what the registry's `io_contract` says was done to it (box order, normalized or pixel boxes, letterbox or stretch). Rows that cannot be real detections (not five finite numbers, score outside 0 to 1 or under the threshold, no area once clipped) are dropped, never repaired; boxes are clipped to the frame, capped per class by `max_detections_per_class` and sorted by score. Tested with gold boxes for both box orders, both resizes and a wide and a tall frame.
 
 - **The registry can be signed:** `registry keygen`, `registry sign` and `registry verify` make and check an Ed25519 signature of the registry file (`<registry>.sig`), and `validate`, `latest`, `load` and `serve` accept `--public-key` (or `HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE`) to refuse a registry that is unsigned, changed after signing or signed with another key. Off until a key is configured; the optional `cryptography` package (extra `signing`) is only needed for it.
