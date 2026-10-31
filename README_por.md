@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="Format">
   <img src="https://img.shields.io/badge/Models-None%20yet%3A%20registry%20only-lightgrey.svg" alt="Models">
-  <img src="https://img.shields.io/badge/Tests-93%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-128%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Versão | `0.1.6` |
 | Maturidade | Funcional |
-| Testes | 93 |
+| Testes | 128 |
 | Tecnologia | Python / Hailo SDK / HEF model registry (no model compiled yet) |
 | Destino | O Raspberry Pi CM5 de uma célula HYDRA-UMC |
 | Em hardware real | Ainda não: não há registo de execução em hardware real para esta versão |
@@ -51,7 +51,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. É 
 | Área | Estado | O que significa aqui |
 |---|---|---|
 | Software | 🟡 | Funciona para o seu propósito principal; a verificação de honestidade acima lista o que ainda falta |
-| Testes | 🟢 | 93 testes automáticos, executados a cada alteração |
+| Testes | 🟢 | 128 testes automáticos, executados a cada alteração |
 | Hardware real | 🔴 | Ainda não: não há registo de execução em hardware real para esta versão |
 | Documentação | 🟢 | README em oito idiomas, verificado contra o manifesto a cada alteração |
 
@@ -116,7 +116,7 @@ O diagrama acima já fixa a forma prevista do pipeline: o treino em PyTorch/YOLO
 * 📐 **Contrato de entrada e saída (opcional):** uma entrada do registo pode levar um `io_contract` que diz como alimentar o modelo (disposição, ordem das cores, tipo de dados, normalização, redimensionamento ou letterbox, valor de preenchimento) e como ler a sua saída (formato NMS, ordem das caixas, caixas normalizadas, limiares). É validado ao carregar o registo, mantido quando o registo é reescrito e a sua soma de verificação faz parte da identidade do modelo. Uma entrada sem ele carrega como antes.
 * 🔐 **Bytes verificados:** `safe_load(..., keep_bytes=True)` lê o ficheiro uma vez, verifica o seu SHA-256 e devolve esses mesmos bytes, pelo que um consumidor que constrói o modelo a partir deles (o streamer de visão e a API de servo visual fazem-no) não pode receber um ficheiro que mudou depois da verificação. O `GET /stats` mostra nomes de ficheiro, não caminhos absolutos, a menos que se passe `serve --stats-full-paths`.
 
-**Verificação de honestidade - o que realmente funciona hoje:** a metade real e independente do hardware da tarefa deste projeto - o registo de modelos (`registry.py`) e a porta real de carregamento seguro (`compatibility.py`), expostos através de `registry validate`/`registry latest`/`registry load` e, como API JSON/HTTP de execução prolongada, através de `serve` (`api.py`) - está implementada e testada (93 testes). Os passos de exportação ONNX, quantização com o Hailo Dataflow Compiler e empacotamento HAR/HEF que realmente *produziriam* os modelos que este registo descreve continuam a ser trabalho futuro: precisam de hardware Hailo real que este ambiente não tem. Veja o [`CHANGELOG.md`](CHANGELOG.md) para saber exatamente o que foi entregue até agora e "Estado atual e próximos passos" abaixo para o que continua em aberto.
+**Verificação de honestidade - o que realmente funciona hoje:** a metade real e independente do hardware da tarefa deste projeto - o registo de modelos (`registry.py`) e a porta real de carregamento seguro (`compatibility.py`), expostos através de `registry validate`/`registry latest`/`registry load` e, como API JSON/HTTP de execução prolongada, através de `serve` (`api.py`) - está implementada e testada (128 testes). Os passos de exportação ONNX, quantização com o Hailo Dataflow Compiler e empacotamento HAR/HEF que realmente *produziriam* os modelos que este registo descreve continuam a ser trabalho futuro: precisam de hardware Hailo real que este ambiente não tem. Veja o [`CHANGELOG.md`](CHANGELOG.md) para saber exatamente o que foi entregue até agora e "Estado atual e próximos passos" abaixo para o que continua em aberto.
 
 Compilar um modelo (ONNX, depois o Hailo Dataflow Compiler e por fim um `.hef`) faz-se num anfitrião Linux x86_64 com o Dataflow Compiler instalado e um conjunto de calibração para a quantização; não precisa do próprio Hailo-8. Só executar o modelo compilado precisa do acelerador. `registry load` e `GET /registry/load` recusam um registo ambíguo (mesmo nome e versão com ficheiros diferentes), aceitam a arquitetura tal como o dispositivo a reporta (`HAILO8`) e permitem fixar uma versão exata com `--version` / `?version=`; `registry add` é serializado para que adições simultâneas não percam entradas. Na placa os modelos estão em `/opt/hydra-umc/detection-hef/models`.
 
@@ -166,7 +166,7 @@ Não há variáveis de ambiente: tudo é uma opção da linha de comandos (`--re
 2. **Ambiente virtual** - cria o `.venv/` se não existir; reutiliza-o caso contrário.
 3. **Instalação editável** - `pip install -e ".[dev]"` para que as edições em `src/` tenham efeito de imediato, instala o `pytest` e regista o ponto de entrada de consola `hydra-umc-detection-hef`.
 4. **Verificação de compilação** - `python -m compileall -q src` compila para bytecode todos os ficheiros de `src/`, apanhando erros de sintaxe em todo o ecossistema.
-5. **Suite de testes real** - `python -m pytest tests/ -q` (93 testes que cobrem o registo, a porta de carregamento seguro e a CLI).
+5. **Suite de testes real** - `python -m pytest tests/ -q` (128 testes que cobrem o registo, a porta de carregamento seguro e a CLI).
 
 O `set -euo pipefail` pára o script no primeiro passo que falhar; a compilação só reporta êxito se os 5 passarem.
 
@@ -223,7 +223,7 @@ run.bat
 
 ## 🧪 Testes
 
-93 testes automáticos correm com `python -m pytest tests/ -q`: o registo, a porta de carga segura, a linha de comandos e a interface HTTP. Não usam ferramentas Hailo, hardware nem rede externa.
+128 testes automáticos correm com `python -m pytest tests/ -q`: o registo, a porta de carga segura, a linha de comandos e a interface HTTP. Não usam ferramentas Hailo, hardware nem rede externa.
 
 A CI executa `HYDRA_UMC_CI=1 python tools/ci_validate.py`, que verifica o manifesto, os documentos, os oito README e as imagens.
 
@@ -278,7 +278,7 @@ HYDRA-UMC-DETECTION-HEF/
 
 **Limites conhecidos hoje**
 
-**O que funciona hoje:** o registo de modelos - validação de esquema (incluindo metadados de arquitetura Hailo obrigatórios e validados), deteção de versões duplicadas, procura da versão mais recente e verificação de integridade sha256 (`registry.py`) - mais uma porta de carregamento seguro real e combinada, que verifica em conjunto a compatibilidade de arquitetura e a integridade da soma de verificação e nunca reporta um modelo como pronto a menos que ambas passem (`compatibility.py`), as mesmas verificações expostas como uma API JSON/HTTP real de execução prolongada (`api.py`, subcomando `serve`) a par da CLI de uma só execução, 93 testes no total, e um pacote Python real e instalável com um ponto de entrada verificado e um comando `bump` explícito, ao estilo conta-quilómetros, que sobe a versão (compilar nunca a altera). Veja o [`CHANGELOG.md`](CHANGELOG.md) para a saída capturada de compilação/execução.
+**O que funciona hoje:** o registo de modelos - validação de esquema (incluindo metadados de arquitetura Hailo obrigatórios e validados), deteção de versões duplicadas, procura da versão mais recente e verificação de integridade sha256 (`registry.py`) - mais uma porta de carregamento seguro real e combinada, que verifica em conjunto a compatibilidade de arquitetura e a integridade da soma de verificação e nunca reporta um modelo como pronto a menos que ambas passem (`compatibility.py`), as mesmas verificações expostas como uma API JSON/HTTP real de execução prolongada (`api.py`, subcomando `serve`) a par da CLI de uma só execução, 128 testes no total, e um pacote Python real e instalável com um ponto de entrada verificado e um comando `bump` explícito, ao estilo conta-quilómetros, que sobe a versão (compilar nunca a altera). Veja o [`CHANGELOG.md`](CHANGELOG.md) para a saída capturada de compilação/execução.
 
 **O que continua em aberto, sem ordem particular, sem calendário comprometido e dependente de hardware Hailo real:**
 

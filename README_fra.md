@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="Format">
   <img src="https://img.shields.io/badge/Models-None%20yet%3A%20registry%20only-lightgrey.svg" alt="Models">
-  <img src="https://img.shields.io/badge/Tests-93%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-128%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Version | `0.1.6` |
 | Maturité | Fonctionnel |
-| Tests | 93 |
+| Tests | 128 |
 | Technologie | Python / Hailo SDK / HEF model registry (no model compiled yet) |
 | Cible | Le Raspberry Pi CM5 d'une cellule HYDRA-UMC |
 | Sur matériel réel | Pas encore : aucune exécution sur du matériel réel n'est consignée pour cette version |
@@ -51,7 +51,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 | Domaine | État | Ce que cela veut dire ici |
 |---|---|---|
 | Logiciel | 🟡 | Fonctionne pour son usage principal ; la vérification d'honnêteté ci-dessus liste ce qui manque encore |
-| Tests | 🟢 | 93 tests automatiques, exécutés à chaque modification |
+| Tests | 🟢 | 128 tests automatiques, exécutés à chaque modification |
 | Matériel réel | 🔴 | Pas encore : aucune exécution sur du matériel réel n'est consignée pour cette version |
 | Documentation | 🟢 | README en huit langues, vérifié par rapport au manifeste à chaque modification |
 
@@ -118,7 +118,7 @@ Le diagramme ci-dessus fixe déjà la forme prévue du pipeline : l'entraînemen
 * 📐 **Contrat d'entrée et de sortie (facultatif) :** une entrée du registre peut porter un `io_contract` qui dit comment alimenter le modèle (disposition, ordre des couleurs, type de donnée, normalisation, redimensionnement ou letterbox, valeur de remplissage) et comment lire sa sortie (format NMS, ordre des boîtes, boîtes normalisées, seuils). Il est validé au chargement du registre, conservé quand le registre est réécrit, et sa somme de contrôle fait partie de l'identité du modèle. Une entrée sans lui se charge comme avant.
 * 🔐 **Octets vérifiés :** `safe_load(..., keep_bytes=True)` lit le fichier une fois, vérifie son SHA-256 et renvoie ces mêmes octets, de sorte qu'un consommateur qui construit le modèle à partir d'eux (le streamer de vision et l'API de servo visuel le font) ne peut pas recevoir un fichier modifié après la vérification. `GET /stats` montre des noms de fichier, pas des chemins absolus, sauf avec `serve --stats-full-paths`.
 
-**Vérification d'honnêteté - ce qui fonctionne réellement aujourd'hui :** la moitié réelle et indépendante du matériel du travail de ce projet - le registre de modèles (`registry.py`) et la vraie passerelle de chargement sécurisé (`compatibility.py`), exposés via `registry validate`/`registry latest`/`registry load` et, comme API JSON/HTTP de longue durée, via `serve` (`api.py`) - est implémentée et testée (93 tests). L'export ONNX, la quantification via le Hailo Dataflow Compiler et l'empaquetage HAR/HEF qui produiraient réellement les modèles décrits par ce registre restent un travail futur : ils nécessitent du vrai matériel Hailo que cet environnement n'a pas. Voir [`CHANGELOG.md`](CHANGELOG.md) pour ce qui a été livré exactement jusqu'à présent, et « État Actuel et Prochaines Étapes » ci-dessous pour ce qui reste ouvert.
+**Vérification d'honnêteté - ce qui fonctionne réellement aujourd'hui :** la moitié réelle et indépendante du matériel du travail de ce projet - le registre de modèles (`registry.py`) et la vraie passerelle de chargement sécurisé (`compatibility.py`), exposés via `registry validate`/`registry latest`/`registry load` et, comme API JSON/HTTP de longue durée, via `serve` (`api.py`) - est implémentée et testée (128 tests). L'export ONNX, la quantification via le Hailo Dataflow Compiler et l'empaquetage HAR/HEF qui produiraient réellement les modèles décrits par ce registre restent un travail futur : ils nécessitent du vrai matériel Hailo que cet environnement n'a pas. Voir [`CHANGELOG.md`](CHANGELOG.md) pour ce qui a été livré exactement jusqu'à présent, et « État Actuel et Prochaines Étapes » ci-dessous pour ce qui reste ouvert.
 
 ## 🔒 Sécurité et protection
 
@@ -166,7 +166,7 @@ Il n'y a pas de variables d'environnement : tout est une option de la ligne de c
 2. **Environnement virtuel** - crée `.venv/` s'il manque ; le réutilise sinon.
 3. **Installation éditable** - `pip install -e ".[dev]"` pour que les modifications sous `src/` prennent effet immédiatement, installe `pytest`, et enregistre le point d'entrée console `hydra-umc-detection-hef`.
 4. **Compile-check** - `python -m compileall -q src` compile en bytecode chaque fichier sous `src/`.
-5. **Suite de tests réelle** - `python -m pytest tests/ -q` (93 tests couvrant le registre, la passerelle de chargement sécurisé et le CLI).
+5. **Suite de tests réelle** - `python -m pytest tests/ -q` (128 tests couvrant le registre, la passerelle de chargement sécurisé et le CLI).
 
 `set -euo pipefail` arrête le script à la première étape en échec ; le build ne signale un succès que si les 5 étapes réussissent.
 
@@ -223,7 +223,7 @@ run.bat
 
 ## 🧪 Tests
 
-93 tests automatiques s'exécutent avec `python -m pytest tests/ -q` : le registre, la porte de chargement sûr, la ligne de commande et l'interface HTTP. Ils n'utilisent ni outils Hailo, ni matériel, ni réseau extérieur.
+128 tests automatiques s'exécutent avec `python -m pytest tests/ -q` : le registre, la porte de chargement sûr, la ligne de commande et l'interface HTTP. Ils n'utilisent ni outils Hailo, ni matériel, ni réseau extérieur.
 
 La CI exécute `HYDRA_UMC_CI=1 python tools/ci_validate.py`, qui vérifie le manifeste, les documents, les huit README et les images.
 
@@ -278,7 +278,7 @@ HYDRA-UMC-DETECTION-HEF/
 
 **Limites connues aujourd'hui**
 
-**Ce qui fonctionne aujourd'hui :** le registre de modèles - validation par schéma (incluant des métadonnées d'architecture Hailo requises et validées), détection de versions en double, recherche de la dernière version, et vérification d'intégrité par sha256 (`registry.py`) - plus une vraie passerelle combinée de chargement sécurisé qui vérifie la compatibilité d'architecture et l'intégrité du checksum ensemble et ne signale jamais un modèle prêt à moins que les deux ne réussissent (`compatibility.py`), les mêmes vérifications exposées comme une vraie API JSON/HTTP de longue durée (`api.py`, sous-commande `serve`) aux côtés du CLI ponctuel, 93 tests au total, plus un vrai paquet Python installable avec un point d'entrée vérifié et une commande `bump` explicite, de type compteur kilométrique, qui augmente la version (compiler ne la change jamais). Voir [`CHANGELOG.md`](CHANGELOG.md) pour la sortie de build/run capturée.
+**Ce qui fonctionne aujourd'hui :** le registre de modèles - validation par schéma (incluant des métadonnées d'architecture Hailo requises et validées), détection de versions en double, recherche de la dernière version, et vérification d'intégrité par sha256 (`registry.py`) - plus une vraie passerelle combinée de chargement sécurisé qui vérifie la compatibilité d'architecture et l'intégrité du checksum ensemble et ne signale jamais un modèle prêt à moins que les deux ne réussissent (`compatibility.py`), les mêmes vérifications exposées comme une vraie API JSON/HTTP de longue durée (`api.py`, sous-commande `serve`) aux côtés du CLI ponctuel, 128 tests au total, plus un vrai paquet Python installable avec un point d'entrée vérifié et une commande `bump` explicite, de type compteur kilométrique, qui augmente la version (compiler ne la change jamais). Voir [`CHANGELOG.md`](CHANGELOG.md) pour la sortie de build/run capturée.
 
 **Ce qui reste ouvert, sans ordre particulier, sans calendrier engagé, et bloqué par du vrai matériel Hailo :**
 

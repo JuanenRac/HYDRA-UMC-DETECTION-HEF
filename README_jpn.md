@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="Format">
   <img src="https://img.shields.io/badge/Models-None%20yet%3A%20registry%20only-lightgrey.svg" alt="Models">
-  <img src="https://img.shields.io/badge/Tests-93%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-128%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | バージョン | `0.1.6` |
 | 成熟度 | 機能する |
-| テスト | 93 |
+| テスト | 128 |
 | 技術 | Python / Hailo SDK / HEF model registry (no model compiled yet) |
 | 対象 | HYDRA-UMC セルの Raspberry Pi CM5 |
 | 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |
@@ -51,7 +51,7 @@ GPL-3.0-or-later - see LICENSE
 | 領域 | 状態 | ここでの意味 |
 |---|---|---|
 | ソフトウェア | 🟡 | 主な目的では動作します。足りない点は上の正直さの確認に書かれています |
-| テスト | 🟢 | 自動テスト 93 件。変更のたびに実行されます |
+| テスト | 🟢 | 自動テスト 128 件。変更のたびに実行されます |
 | 実機 | 🔴 | まだです：このバージョンについて実機での動作記録はありません |
 | ドキュメント | 🟢 | 8 言語の README。変更のたびにマニフェストと照合されます |
 
@@ -131,7 +131,7 @@ ONNX にエクスポートされ、Hailo Dataflow Compiler を通じて INT8/INT
 * 📐 **入出力の取り決め(任意):** レジストリの項目には `io_contract` を付けられます。モデルへの入力のしかた(レイアウト、色順、データ型、正規化、リサイズまたはレターボックス、パディング値)と、出力の読み方(NMS の形式、ボックスの順序、正規化されたボックス、しきい値)を示します。レジストリの読み込み時に検証され、レジストリを書き直しても保たれ、そのチェックサムはモデルの識別情報に含まれます。付いていない項目はこれまでどおり読み込まれます。
 * 🔐 **検証済みバイト列:** `safe_load(..., keep_bytes=True)` はファイルを一度だけ読み、SHA-256 を確認して、そのバイト列をそのまま返します。これらからモデルを組み立てる側(ビジョンストリーマーとビジュアルサーボ API がそうします)は、確認後に変わったファイルを渡されることがありません。`GET /stats` は絶対パスではなくファイル名を示します(`serve --stats-full-paths` を付けた場合を除く)。
 
-**正直な現状確認 —— 今日実際に動くもの：** 本プロジェクトの仕事のうち、実際にハードウェアに依存しない半分——モデルレジストリ（`registry.py`）と実際の安全なロードのゲート（`compatibility.py`）——は、`registry validate`/`registry latest`/`registry load`、および長時間稼働する JSON/HTTP API としての `serve`（`api.py`）を通じて公開され、実装され、テストされています（93 個のテスト）。このレジストリが記述するモデルを実際に*生成*する ONNX エクスポート、Hailo Dataflow Compiler による量子化、HAR/HEF パッケージングは、依然として将来の作業です：いずれもこの環境にはない実際の Hailo ハードウェアを必要とします。
+**正直な現状確認 —— 今日実際に動くもの：** 本プロジェクトの仕事のうち、実際にハードウェアに依存しない半分——モデルレジストリ（`registry.py`）と実際の安全なロードのゲート（`compatibility.py`）——は、`registry validate`/`registry latest`/`registry load`、および長時間稼働する JSON/HTTP API としての `serve`（`api.py`）を通じて公開され、実装され、テストされています（128 個のテスト）。このレジストリが記述するモデルを実際に*生成*する ONNX エクスポート、Hailo Dataflow Compiler による量子化、HAR/HEF パッケージングは、依然として将来の作業です：いずれもこの環境にはない実際の Hailo ハードウェアを必要とします。
 実際に出荷済みの内容は [`CHANGELOG.md`](CHANGELOG.md) を、まだ残っている
 作業は下記の「現在の状況と次のステップ」セクションを参照してください。
 
@@ -181,7 +181,7 @@ ONNX にエクスポートされ、Hailo Dataflow Compiler を通じて INT8/INT
 2. **仮想環境** — `.venv/` が存在しない場合は作成し、存在する場合は再利用します。
 3. **Editable インストール** — `pip install -e ".[dev]"` により `src/` 下の変更が即座に反映され、`pytest` がインストールされ、`hydra-umc-detection-hef` コンソールエントリポイントが登録されます。
 4. **コンパイルチェック** — `python -m compileall -q src` が `src/` 下の各ファイルをバイトコンパイルし、エコシステム全体にわたる構文エラーを検出します。
-5. **実際のテストスイート** — `python -m pytest tests/ -q`（レジストリ、安全なロードのゲート、CLI をカバーする 93 個のテスト）。
+5. **実際のテストスイート** — `python -m pytest tests/ -q`（レジストリ、安全なロードのゲート、CLI をカバーする 128 個のテスト）。
 
 `set -euo pipefail` は最初に失敗したステップでスクリプトを停止させます。
 5 つのステップすべてが成功した場合にのみビルドは成功を報告します。
@@ -245,7 +245,7 @@ run.bat
 
 ## 🧪 テスト
 
-`python -m pytest tests/ -q` で自動テスト 93 件を実行します。レジストリ、安全なロードのゲート、コマンドライン、HTTP の窓口が対象で、Hailo のツール、ハードウェア、外部ネットワークは使いません。
+`python -m pytest tests/ -q` で自動テスト 128 件を実行します。レジストリ、安全なロードのゲート、コマンドライン、HTTP の窓口が対象で、Hailo のツール、ハードウェア、外部ネットワークは使いません。
 
 CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェスト、文書、8 つの README、図を検査します。
 
@@ -300,7 +300,7 @@ HYDRA-UMC-DETECTION-HEF/
 
 **現時点の既知の制限**
 
-**今日実現していること：** モデルレジストリ——スキーマ検証(必須の、検証済みの Hailo アーキテクチャメタデータを含む)、重複バージョンの検出、最新バージョンの検索、sha256 による整合性検証（`registry.py`）——に加え、アーキテクチャ互換性とチェックサムの整合性を一緒にチェックし、両方が通った場合にのみモデルを準備完了として報告する実際の組み合わせ安全ロードゲート（`compatibility.py`）、同じチェックを一回限りの CLI と並んで実際の長時間稼働 JSON/HTTP API（`api.py`、`serve` サブコマンド）としても公開、合計 93 個のテスト、さらに検証済みのエントリポイントを持つ実際のインストール
+**今日実現していること：** モデルレジストリ——スキーマ検証(必須の、検証済みの Hailo アーキテクチャメタデータを含む)、重複バージョンの検出、最新バージョンの検索、sha256 による整合性検証（`registry.py`）——に加え、アーキテクチャ互換性とチェックサムの整合性を一緒にチェックし、両方が通った場合にのみモデルを準備完了として報告する実際の組み合わせ安全ロードゲート（`compatibility.py`）、同じチェックを一回限りの CLI と並んで実際の長時間稼働 JSON/HTTP API（`api.py`、`serve` サブコマンド）としても公開、合計 128 個のテスト、さらに検証済みのエントリポイントを持つ実際のインストール
 可能な Python パッケージ、そして、バージョンを上げる明示的な `bump` コマンド（ビルドがバージョンを変えることはありません）。実際に取得されたビルド/実行出力については
 [`CHANGELOG.md`](CHANGELOG.md) を参照してください。
 

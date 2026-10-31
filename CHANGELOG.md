@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Reference decoder** (`decoder.py`, pure Python): `decode_nms_by_class()` turns the NMS-by-class output of a Hailo model into detections in the pixels of the original frame, undoing what the registry's `io_contract` says was done to it (box order, normalized or pixel boxes, letterbox or stretch). Rows that cannot be real detections (not five finite numbers, score outside 0 to 1 or under the threshold, no area once clipped) are dropped, never repaired; boxes are clipped to the frame, capped per class by `max_detections_per_class` and sorted by score. Tested with gold boxes for both box orders, both resizes and a wide and a tall frame.
+
 - **The registry can be signed:** `registry keygen`, `registry sign` and `registry verify` make and check an Ed25519 signature of the registry file (`<registry>.sig`), and `validate`, `latest`, `load` and `serve` accept `--public-key` (or `HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE`) to refuse a registry that is unsigned, changed after signing or signed with another key. Off until a key is configured; the optional `cryptography` package (extra `signing`) is only needed for it.
 - **`registry add --classes-sha256`:** an optional check that the labels given are the class list of the dataset the model was trained on (the hash that the synthetic dataset manifest publishes); a different label or order is refused before the registry is written.
 - **`docs/COMPILING_A_HEF.md`:** the manual steps for compiling a HEF with Hailo's Dataflow Compiler (parse, optimize with a calibration set, compile) and registering it with `registry add`, and a note that the script that automates them waits for a Dataflow Compiler licence.
