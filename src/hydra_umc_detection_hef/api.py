@@ -21,6 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from .service_metrics import MetricsHandlerMixin
 from .compatibility import safe_load
 from .registry import AmbiguousModelError, RegistryError, duplicate_versions, find_latest, load_registry
 
@@ -53,8 +54,9 @@ def _query_params(handler: BaseHTTPRequestHandler) -> dict[str, str]:
     return {key: value[0] for key, value in values.items()}
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
     server: "RegistryServer"
+    metrics_service = "hydra-umc-detection-hef"
 
     # Seconds a client may stay silent on its connection before the server
     # drops it, so a client that connects and sends nothing cannot hold a
@@ -72,6 +74,8 @@ class Handler(BaseHTTPRequestHandler):
             return None, "handled"
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.serve_metrics():
+            return
         path = urlparse(self.path).path
         try:
             params = _query_params(self)
