@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="Format">
   <img src="https://img.shields.io/badge/Models-None%20yet%3A%20registry%20only-lightgrey.svg" alt="Models">
-  <img src="https://img.shields.io/badge/Tests-193%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-196%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.7-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | 版本 | `0.1.7` |
 | 成熟度 | 可用 |
-| 测试 | 193 |
+| 测试 | 196 |
 | 技术栈 | Python / Hailo SDK / HEF model registry (no model compiled yet) |
 | 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
@@ -51,7 +51,7 @@ GPL-3.0-or-later - see LICENSE
 | 领域 | 状态 | 在这里的含义 |
 |---|---|---|
 | 软件 | 🟡 | 主要用途可用；上面的诚实性检查列出了仍然缺少的内容 |
-| 测试 | 🟢 | 193 项自动测试，每次变更都会运行 |
+| 测试 | 🟢 | 196 项自动测试，每次变更都会运行 |
 | 真实硬件 | 🔴 | 尚未：此版本没有在真实硬件上运行的记录 |
 | 接口与协议 | 🟡 | 提供的路由或消息已有文档，并用客户端测试过；尚未被所有客户端使用 |
 | 集成 | 🟠 | 在 CM5 测试台上与其他服务一起运行，其消息遵循 SDK 的共享契约 |
@@ -131,9 +131,10 @@ INT8/INT4 量化（生成 `.har`），最后打包为 [HYDRA-UMC-VISION-NODE](ht
 * 📐 **新模型必须有契约，加载时可选：** `registry add` 需要一个 `io_contract` 文件（或明确写出 `--no-io-contract`）；`--require-io-contract` 会让没有契约的条目在读取注册表时报错并拒绝加载（默认关闭，因此旧注册表仍可加载）。条目还带有 `channel`（`stable` 或 `canary`），节点可以把已加载的模型报告给 `POST /models/loaded`（默认关闭），并得到注册表的判定。
 * 🎯 **编译后的精度（关卡默认关闭）：** `registry record-accuracy` 根据已编译模型的检测结果和真实框测量 mAP@0.5，并与量化前模型的得分一并记录；`--min-accuracy-ratio` 会拒绝损失过大或从未测量过的模型。生成检测结果需要加速器，这里不做。
 * 📦 **用于空中更新的签名包（默认关闭）：** `registry make-bundle` 打包已签名的注册表和 `.hef` 文件；`registry apply-bundle` 在写入任何内容之前检查所有哈希、签名和版本，需要公钥和明确的开关，保留上一个注册表并可回滚。把包推送到节点仍是更新器的工作，目前尚未连接。
+* 📨 **SDK 契约中的检测结果：** `decoder.detection_frame` 把解码后的检测结果转成视觉节点以及安全和伺服服务读取的 `DetectionFrame` 消息（像素或归一化的角点框、帧、采集时刻和模型身份）；旧的 `Detection.as_dict` 保持不变。
 * 🔐 **已验证的字节:** `safe_load(..., keep_bytes=True)` 只读取文件一次，检查其 SHA-256，并原样返回这些字节；因此用这些字节构建模型的使用方(视觉推流器和视觉伺服 API 就是这样做的)不会拿到校验之后又被改动的文件。`GET /stats` 只显示文件名而不是绝对路径，除非加上 `serve --stats-full-paths`。
 
-**诚实说明——今天实际运行的内容：** 本项目工作中真实、独立于硬件的那一半——模型注册表（`registry.py`）和真实的安全加载关卡（`compatibility.py`）——通过 `registry validate`/`registry latest`/`registry load`，以及作为长期运行 JSON/HTTP API 的 `serve`（`api.py`）暴露，已经实现并经过测试（193 个测试）。而真正*生产*这些注册表所描述模型的 ONNX 导出、Hailo Dataflow Compiler 量化和 HAR/HEF 打包步骤仍是未来工作：它们都需要本环境不具备的真实 Hailo 硬件。具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，尚待完成的
+**诚实说明——今天实际运行的内容：** 本项目工作中真实、独立于硬件的那一半——模型注册表（`registry.py`）和真实的安全加载关卡（`compatibility.py`）——通过 `registry validate`/`registry latest`/`registry load`，以及作为长期运行 JSON/HTTP API 的 `serve`（`api.py`）暴露，已经实现并经过测试（196 个测试）。而真正*生产*这些注册表所描述模型的 ONNX 导出、Hailo Dataflow Compiler 量化和 HAR/HEF 打包步骤仍是未来工作：它们都需要本环境不具备的真实 Hailo 硬件。具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，尚待完成的
 内容请参见下方"当前状态与后续步骤"章节。
 
 编译模型（ONNX，然后经 Hailo Dataflow Compiler，最后得到 `.hef`）在安装了 Dataflow Compiler 的 x86_64 Linux 主机上进行，并需要用于量化的校准数据集，不需要 Hailo-8 本身。只有运行编译后的模型才需要加速器。`registry load` 和 `GET /registry/load` 会拒绝有歧义的注册表（相同名称和版本对应不同文件），接受设备所报告的架构写法（`HAILO8`），并可用 `--version` / `?version=` 固定确切版本；`registry add` 已串行化，同时添加不会丢失条目。在开发板上，模型位于 `/opt/hydra-umc/detection-hef/models`。
@@ -184,7 +185,7 @@ INT8/INT4 量化（生成 `.har`），最后打包为 [HYDRA-UMC-VISION-NODE](ht
 2. **虚拟环境** —— 若 `.venv/` 不存在则创建；否则复用。
 3. **可编辑安装** —— `pip install -e ".[dev]"`，使 `src/` 下的修改立即生效，安装 `pytest`，并注册 `hydra-umc-detection-hef` 控制台入口点。
 4. **编译检查** —— `python -m compileall -q src` 对 `src/` 下每个文件进行字节码编译，在整个生态系统范围内捕获语法错误。
-5. **真实测试套件** —— `python -m pytest tests/ -q`（193 个测试，覆盖注册表、安全加载关卡和 CLI）。
+5. **真实测试套件** —— `python -m pytest tests/ -q`（196 个测试，覆盖注册表、安全加载关卡和 CLI）。
 
 `set -euo pipefail` 会在第一个失败步骤处停止脚本；只有全部 5 个步骤均
 成功时，构建才会报告成功。
@@ -246,7 +247,7 @@ run.bat
 
 ## 🧪 测试
 
-运行 `python -m pytest tests/ -q` 会执行 193 个自动测试：注册表、安全加载关口、命令行和 HTTP 接口。不使用 Hailo 工具、硬件和外部网络。
+运行 `python -m pytest tests/ -q` 会执行 196 个自动测试：注册表、安全加载关口、命令行和 HTTP 接口。不使用 Hailo 工具、硬件和外部网络。
 
 CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档、八个 README 和图片。
 
@@ -301,7 +302,7 @@ HYDRA-UMC-DETECTION-HEF/
 
 **当前已知限制**
 
-**今天已实现的内容：** 模型注册表——模式校验（包括必须提供且经过校验的 Hailo 架构元数据）、重复版本检测、最新版本查找、以及 sha256 完整性校验（`registry.py`）——加上一个真实的、组合式的安全加载关卡，会一起检查架构兼容性和校验和完整性，只有两者都通过时才会报告模型就绪（`compatibility.py`），同样的检查也作为一个真实的、长期运行的 JSON/HTTP API（`api.py`，`serve` 子命令）与一次性 CLI 并行暴露，共 193 个测试，再加上一个真实的、可安装的 Python 包，带有已验证的入口点，以及一个显式的`bump` 命令，用于提升版本（构建绝不会更改版本）。具体已捕获的构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
+**今天已实现的内容：** 模型注册表——模式校验（包括必须提供且经过校验的 Hailo 架构元数据）、重复版本检测、最新版本查找、以及 sha256 完整性校验（`registry.py`）——加上一个真实的、组合式的安全加载关卡，会一起检查架构兼容性和校验和完整性，只有两者都通过时才会报告模型就绪（`compatibility.py`），同样的检查也作为一个真实的、长期运行的 JSON/HTTP API（`api.py`，`serve` 子命令）与一次性 CLI 并行暴露，共 196 个测试，再加上一个真实的、可安装的 Python 包，带有已验证的入口点，以及一个显式的`bump` 命令，用于提升版本（构建绝不会更改版本）。具体已捕获的构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 **仍待完成、顺序不分先后、无既定时间表、且受限于真实 Hailo 硬件的内容：**
 

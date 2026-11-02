@@ -50,6 +50,32 @@ class Detection:
         }
 
 
+def detection_frame(
+    detections: "list[Detection]", *, frame_id: str, capture_ts_utc: str, frame_size: tuple[int, int], model: dict[str, str] | None = None,
+    session_id: str | None = None, box_unit: str = "pixel",
+) -> dict:
+    """The detections as the `DetectionFrame` message of the SDK contract (closed object, `schema_version` "1.0"): boxes by their corners `x_min`, `y_min`, `x_max`,
+    `y_max` with the origin at the top left corner of the frame, in pixels or (with `box_unit="normalized"`) as fractions of the frame, one `class_id`, `label` and `score`
+    each. `model` is the identity of the model (`model_name`, `model_version`, `model_sha256`, `hailo_arch`, `pipeline_version`; `compatibility.model_identity` gives the
+    first four, the pipeline version is the consumer's own to add). `Detection.as_dict`, with camelCase names and a `box` of `xMin`..., stays as it was for the callers
+    that read it."""
+    width, height = _positive_int(frame_size[0], "frame width"), _positive_int(frame_size[1], "frame height")
+    if box_unit not in ("pixel", "normalized"):
+        raise DecodeError(f"box_unit must be pixel or normalized, got {box_unit!r}")
+    scale = (1.0, 1.0) if box_unit == "pixel" else (1.0 / width, 1.0 / height)
+    items = [
+        {"class_id": d.class_id, "label": d.label, "score": d.score,
+         "box": {"x_min": d.x_min * scale[0], "y_min": d.y_min * scale[1], "x_max": d.x_max * scale[0], "y_max": d.y_max * scale[1]}}
+        for d in detections
+    ]
+    message: dict = {"schema_version": "1.0", "frame_id": frame_id, "capture_ts_utc": capture_ts_utc, "box_unit": box_unit, "detections": items}
+    if model is not None:
+        message["model"] = dict(model)
+    if session_id is not None:
+        message["session_id"] = session_id
+    return message
+
+
 def _positive_int(value: object, label: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise DecodeError(f"{label} must be a positive integer, got {value!r}")

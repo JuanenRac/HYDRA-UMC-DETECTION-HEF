@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from hydra_umc_detection_hef.decoder import DecodeError, decode_nms_by_class, letterbox_geometry
+from hydra_umc_detection_hef.decoder import DecodeError, decode_nms_by_class, detection_frame, letterbox_geometry
 
 CONTRACT = {
     "input": {"layout": "NHWC", "color_order": "RGB", "dtype": "uint8", "normalization": "on-chip", "resize": "letterbox", "pad_value": 114},
@@ -119,3 +119,42 @@ def test_refuses_other_formats_and_resizes():
         _decode([[], []], contract)
     with pytest.raises(DecodeError):
         _decode([[], []], {"input": {}})
+
+
+MODEL = {"model_name": "pcb", "model_version": "0.1.0", "model_sha256": "a" * 64, "hailo_arch": "hailo8", "pipeline_version": "0.1.0"}
+STAMP = "2026-01-02T03:04:05.678Z"
+
+
+def test_detections_become_the_detection_frame_of_the_sdk_contract():
+    dets = _decode([[[0.375, 0.25, 0.53125, 0.5, 0.9]], [[0.1, 0.1, 0.2, 0.2, 0.5]]])
+    pixel = detection_frame(dets, frame_id="cam0-7", capture_ts_utc=STAMP, frame_size=(1280, 720), model=MODEL, session_id="s1")
+    assert pixel["schema_version"] == "1.0" and pixel["box_unit"] == "pixel" and pixel["model"] == MODEL and pixel["session_id"] == "s1"
+    first = pixel["detections"][0]
+    assert set(first) == {"class_id", "label", "score", "box"} and set(first["box"]) == {"x_min", "y_min", "x_max", "y_max"}
+    assert first["box"]["x_min"] < first["box"]["x_max"] and first["box"]["y_min"] < first["box"]["y_max"]
+    normalized = detection_frame(dets, frame_id="cam0-7", capture_ts_utc=STAMP, frame_size=(1280, 720), box_unit="normalized")
+    assert "model" not in normalized and "session_id" not in normalized
+    assert normalized["detections"][0]["box"]["x_max"] == pytest.approx(first["box"]["x_max"] / 1280)
+    assert all(0 <= v <= 1 for d in normalized["detections"] for v in d["box"].values())
+    assert detection_frame([], frame_id="f", capture_ts_utc=STAMP, frame_size=(10, 10))["detections"] == []
+
+
+def test_the_detection_frame_refuses_a_bad_unit_or_size():
+    with pytest.raises(DecodeError):
+        detection_frame([], frame_id="f", capture_ts_utc=STAMP, frame_size=(10, 10), box_unit="meters")
+    with pytest.raises(DecodeError):
+        detection_frame([], frame_id="f", capture_ts_utc=STAMP, frame_size=(0, 10))
+
+
+def test_the_message_is_accepted_by_the_sdk_validator_when_the_sdk_is_next_to_this_repository(monkeypatch):
+    import importlib
+    from pathlib import Path
+
+    source = Path(__file__).resolve().parents[2] / "HYDRA-UMC-SDK" / "clients" / "python" / "src"
+    if not (source / "hydra_umc_sdk" / "vision_pipeline.py").is_file():
+        pytest.skip("the SDK checkout is not next to this repository")
+    monkeypatch.syspath_prepend(str(source))
+    sdk = importlib.import_module("hydra_umc_sdk.vision_pipeline")
+    dets = _decode([[[0.375, 0.25, 0.53125, 0.5, 0.9]], []])
+    for unit in ("pixel", "normalized"):
+        sdk.validate_detection_frame(detection_frame(dets, frame_id="cam0-7", capture_ts_utc=STAMP, frame_size=(1280, 720), model=MODEL, box_unit=unit))
