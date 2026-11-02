@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="Format">
   <img src="https://img.shields.io/badge/Models-None%20yet%3A%20registry%20only-lightgrey.svg" alt="Models">
-  <img src="https://img.shields.io/badge/Tests-150%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-193%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.7-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Version | `0.1.7` |
 | Maturity | Functional |
-| Tests | 150 |
+| Tests | 193 |
 | Stack | Python / Hailo SDK / HEF model registry (no model compiled yet) |
 | Target | The Raspberry Pi CM5 of a HYDRA-UMC cell |
 | On real hardware | Not yet: no run on real hardware is recorded for this version |
@@ -51,7 +51,7 @@ Each line is one part of this repository and the light says how far it is today.
 | Area | State | What it means here |
 |---|---|---|
 | Software | 🟡 | Works for its main purpose; the honesty check above lists what is still missing |
-| Tests | 🟢 | 150 automated tests, run on every change |
+| Tests | 🟢 | 193 automated tests, run on every change |
 | Real hardware | 🔴 | Not yet: no run on real hardware is recorded for this version |
 | Interface and protocols | 🟡 | The routes or messages it offers are documented and tested with a client; not every client has used them yet |
 | Integration | 🟠 | It runs together with the other services on the CM5 test bench and its messages follow the shared contracts of the SDK |
@@ -122,9 +122,12 @@ The diagram above already fixes the intended pipeline shape: PyTorch/YOLO traini
 * 🤖 **Pose Estimation (planned):** keypoint detection for robotic arm joint tracking. *(future work, same reason.)*
 * 🧩 **Why it exists as its own project:** compiling and versioning models is a data/ML workflow, entirely different from the runtime process that serves them - keeping the toolchain here means a bad compile never risks the running perception node, and models can be iterated on and validated offline before ever reaching [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE).
 * 📐 **Input and output contract (optional):** a registry entry may carry an `io_contract` that says how to feed the model (layout, colour order, data type, normalisation, resize or letterbox, pad value) and how to read its output (NMS format, box order, normalised boxes, thresholds). It is validated when the registry loads, kept when the registry is rewritten, and its checksum is part of the model identity. An entry without it loads as before.
+* 📐 **The contract is required for new models, optionally for loading:** `registry add` needs an `io_contract` file (or an explicit `--no-io-contract`); `--require-io-contract` makes an entry without one an error when the registry is read and refuses to load it (off by default, so older registries keep loading). Entries also carry a `channel` (`stable` or `canary`), and a node can report the model it loaded to `POST /models/loaded` (off by default) to get a verdict from the registry.
+* 🎯 **Accuracy after compilation (gate off by default):** `registry record-accuracy` measures the mAP@0.5 of the compiled model from its detections and the true boxes and records it next to the score of the model before quantization; `--min-accuracy-ratio` refuses a model that lost too much or that was never measured. Producing the detections needs the accelerator and is not done here.
+* 📦 **Signed bundles for updates over the air (off by default):** `registry make-bundle` packs the signed registry and the `.hef` files; `registry apply-bundle` checks every hash, the signature and the versions before writing anything, needs the public key and an explicit switch, keeps the previous registry and can roll back. Pushing bundles to the nodes is still the job of the updater and is not wired.
 * 🔐 **Verified bytes:** `safe_load(..., keep_bytes=True)` reads the file once, checks its SHA-256 and returns those same bytes, so a consumer that builds the model from them (the vision streamer and the visual servoing API do) cannot be handed a file that changed after the check. `GET /stats` shows file names, not absolute paths, unless `serve --stats-full-paths` is given.
 
-**Honesty check - what actually runs today:** the real, hardware-independent half of this project's job - the model registry (`registry.py`) and the real safe-load gate (`compatibility.py`), exposed via `registry validate`/`registry latest`/`registry load` and, as a long-running JSON/HTTP API, via `serve` (`api.py`) - is implemented and tested (150 tests). The ONNX export, Hailo Dataflow Compiler quantization, and HAR/HEF packaging steps that would actually *produce* the models this registry describes are still future work: they need real Hailo hardware this environment doesn't have. See [`CHANGELOG.md`](CHANGELOG.md) for exactly what has shipped so far, and "Roadmap & Known limits" below for what remains open.
+**Honesty check - what actually runs today:** the real, hardware-independent half of this project's job - the model registry (`registry.py`) and the real safe-load gate (`compatibility.py`), exposed via `registry validate`/`registry latest`/`registry load` and, as a long-running JSON/HTTP API, via `serve` (`api.py`) - is implemented and tested (193 tests). The ONNX export, Hailo Dataflow Compiler quantization, and HAR/HEF packaging steps that would actually *produce* the models this registry describes are still future work: they need real Hailo hardware this environment doesn't have. See [`CHANGELOG.md`](CHANGELOG.md) for exactly what has shipped so far, and "Roadmap & Known limits" below for what remains open.
 
 ## 🔒 Security & Safety
 
@@ -172,7 +175,7 @@ There are no environment variables: everything is a command-line flag (`--regist
 2. **Virtual environment** - creates `.venv/` if missing; reuses it otherwise.
 3. **Editable install** - `pip install -e ".[dev]"` so `src/` edits take effect immediately, installs `pytest`, and registers the `hydra-umc-detection-hef` console entry point.
 4. **Compile-check** - `python -m compileall -q src` byte-compiles every file under `src/`, catching syntax errors ecosystem-wide.
-5. **Real test suite** - `python -m pytest tests/ -q` (150 tests covering the registry, the safe-load gate, and the CLI).
+5. **Real test suite** - `python -m pytest tests/ -q` (193 tests covering the registry, the safe-load gate, and the CLI).
 
 `set -euo pipefail` stops the script at the first failing step; the build only reports success if all 5 pass.
 
@@ -229,7 +232,7 @@ run.bat
 
 ## 🧪 Testing
 
-150 automated tests run with `python -m pytest tests/ -q`: the registry, the safe-load gate, the command line and the HTTP surface. They use no Hailo tooling, no hardware and no outside network.
+193 automated tests run with `python -m pytest tests/ -q`: the registry, the safe-load gate, the command line and the HTTP surface. They use no Hailo tooling, no hardware and no outside network.
 
 The CI runs `HYDRA_UMC_CI=1 python tools/ci_validate.py`, which checks the manifest, the documents, the eight READMEs and the pictures.
 
@@ -284,7 +287,7 @@ HYDRA-UMC-DETECTION-HEF/
 
 **Known limits today**
 
-**What works today:** the model registry - schema validation (including required, validated Hailo-architecture metadata), duplicate-version detection, latest-version lookup, and sha256 integrity checking (`registry.py`) - plus a real, combined safe-load gate that checks architecture compatibility and checksum integrity together and never reports a model ready unless both pass (`compatibility.py`), the same checks exposed as a real long-running JSON/HTTP API (`api.py`, `serve` subcommand) alongside the one-shot CLI, 150 tests total, and a real, installable Python package with a verified entry point and an explicit `bump` command that raises the version (building never changes it). See [`CHANGELOG.md`](CHANGELOG.md) for the captured build/run output.
+**What works today:** the model registry - schema validation (including required, validated Hailo-architecture metadata), duplicate-version detection, latest-version lookup, and sha256 integrity checking (`registry.py`) - plus a real, combined safe-load gate that checks architecture compatibility and checksum integrity together and never reports a model ready unless both pass (`compatibility.py`), the same checks exposed as a real long-running JSON/HTTP API (`api.py`, `serve` subcommand) alongside the one-shot CLI, 193 tests total, and a real, installable Python package with a verified entry point and an explicit `bump` command that raises the version (building never changes it). See [`CHANGELOG.md`](CHANGELOG.md) for the captured build/run output.
 
 **What is still open, in no particular order and with no committed timeline, and blocked on real Hailo hardware:**
 

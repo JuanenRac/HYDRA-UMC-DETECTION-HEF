@@ -24,7 +24,7 @@ import enum
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .registry import ModelEntry, io_contract_sha256, read_verified
+from .registry import ModelEntry, accuracy_ratio, io_contract_sha256, read_verified
 
 
 class LoadOutcome(enum.Enum):
@@ -32,6 +32,8 @@ class LoadOutcome(enum.Enum):
     REJECTED_ARCH_MISMATCH = "rejected_arch_mismatch"
     REJECTED_MISSING_FILE = "rejected_missing_file"
     REJECTED_CHECKSUM_MISMATCH = "rejected_checksum_mismatch"
+    REJECTED_NO_IO_CONTRACT = "rejected_no_io_contract"
+    REJECTED_ACCURACY = "rejected_accuracy"
 
 
 @dataclass(frozen=True)
@@ -63,7 +65,10 @@ def check_arch_compatibility(entry: ModelEntry, target_arch: str) -> bool:
     return entry.hailo_arch == target_arch.strip().lower()
 
 
-def safe_load(entry: ModelEntry, models_dir: Path, target_arch: str, keep_bytes: bool = False) -> LoadResult:
+def safe_load(
+    entry: ModelEntry, models_dir: Path, target_arch: str, keep_bytes: bool = False, *,
+    require_io_contract: bool = False, min_accuracy_ratio: float | None = None,
+) -> LoadResult:
     """The real, combined safe-load decision for one registry entry.
 
     Checks architecture compatibility FIRST (pure metadata, no I/O) -
@@ -71,7 +76,10 @@ def safe_load(entry: ModelEntry, models_dir: Path, target_arch: str, keep_bytes:
     ever touches the filesystem, and the rejection reason names the
     most fundamental failing gate rather than a misleading "file missing"
     for a model that was never going to run on this hardware anyway.
-    Only once the architecture matches does it verify the checksum
+    Then the two checks that are also pure metadata, both off unless asked for: with `require_io_contract` an entry that does not say how
+    to feed the model and read its output is refused, and with `min_accuracy_ratio` (0 to 1) so is an entry whose quantized model scored less than
+    that share of the model it came from (or has no measurement at all: a gate that is on does not guess).
+    Only once those pass does it verify the checksum
     against the real local file. With `keep_bytes=True` the verified bytes come back in `LoadResult.data`.
     """
     if not check_arch_compatibility(entry, target_arch):
@@ -80,6 +88,27 @@ def safe_load(entry: ModelEntry, models_dir: Path, target_arch: str, keep_bytes:
             entry=entry,
             detail=f"model compiled for {entry.hailo_arch!r}, this deployment targets {target_arch!r}",
         )
+
+    if require_io_contract and entry.io_contract is None:
+        return LoadResult(
+            outcome=LoadOutcome.REJECTED_NO_IO_CONTRACT,
+            entry=entry,
+            detail=f"{entry.name} {entry.version} has no io_contract: a consumer cannot know how to feed it or read its output",
+        )
+    if min_accuracy_ratio is not None:
+        ratio = accuracy_ratio(entry)
+        if ratio is None:
+            return LoadResult(
+                outcome=LoadOutcome.REJECTED_ACCURACY,
+                entry=entry,
+                detail=f"{entry.name} {entry.version} has no accuracy measurement and a minimum ratio of {min_accuracy_ratio:g} is required",
+            )
+        if ratio < min_accuracy_ratio:
+            return LoadResult(
+                outcome=LoadOutcome.REJECTED_ACCURACY,
+                entry=entry,
+                detail=f"the quantized model of {entry.name} {entry.version} scores {ratio:.3f} of the reference, below the minimum {min_accuracy_ratio:g}",
+            )
 
     checksum_ok, data = read_verified(entry, models_dir)
     if checksum_ok is None:

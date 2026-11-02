@@ -171,14 +171,22 @@ def test_registry_load_accepts_the_architecture_as_hailortcli_prints_it(tmp_path
     assert "READY" in result.stdout
 
 
+IO_CONTRACT = {
+    "input": {"layout": "NHWC", "color_order": "RGB", "dtype": "uint8", "normalization": "on-chip", "resize": "letterbox"},
+    "output": {"format": "hailo_nms_by_class", "bbox_order": "ymin,xmin,ymax,xmax", "bbox_normalized": True, "nms_on_chip": True},
+}
+
+
 def _add_args(tmp_path, classes, extra=()):
     models = tmp_path / "models"
     models.mkdir(exist_ok=True)
     (models / "m.hef").write_bytes(b"hef-bytes")
+    contract = tmp_path / "io-contract.json"
+    contract.write_text(json.dumps(IO_CONTRACT), encoding="utf-8")
     return run_cli(
         "registry", "add", "--registry", str(tmp_path / "reg.json"), "--models-dir", str(models),
         "--hef-path", "m.hef", "--name", "m", "--version", "0.1.0", "--task", "detection",
-        "--input-shape", "64,64,3", "--classes", classes, "--hailo-arch", "hailo8", *extra,
+        "--input-shape", "64,64,3", "--classes", classes, "--hailo-arch", "hailo8", "--io-contract", str(contract), *extra,
     )
 
 

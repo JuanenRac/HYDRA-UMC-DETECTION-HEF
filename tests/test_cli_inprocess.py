@@ -7,6 +7,7 @@
 handlers of main.py are measured and their current output is pinned."""
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 
@@ -155,6 +156,12 @@ def _add_args(reg, models, **over):
         "--name": "pcb-defect", "--version": "0.3.0", "--task": "detection",
         "--input-shape": "640,640,3", "--classes": "a,b", "--hailo-arch": "hailo8",
     }
+    contract = Path(str(reg)).with_name("io-contract.json")
+    contract.write_text(json.dumps({
+        "input": {"layout": "NHWC", "color_order": "RGB", "dtype": "uint8", "normalization": "on-chip", "resize": "letterbox"},
+        "output": {"format": "hailo_nms_by_class", "bbox_order": "ymin,xmin,ymax,xmax", "bbox_normalized": True, "nms_on_chip": True},
+    }), encoding="utf-8")
+    args["--io-contract"] = str(contract)
     args.update(over)
     out = ["registry", "add"]
     for key, value in args.items():
@@ -238,8 +245,9 @@ def test_keygen_sign_verify_roundtrip(monkeypatch, capsys, workspace, tmp_path):
 class _FakeServer:
     created: list = []
 
-    def __init__(self, addr, registry, models_dir, show_paths=False, public_key_file=None):
+    def __init__(self, addr, registry, models_dir, show_paths=False, public_key_file=None, **options):
         self.args = (addr, registry, models_dir, show_paths, public_key_file)
+        self.options = options
         self.closed = False
         _FakeServer.created.append(self)
 

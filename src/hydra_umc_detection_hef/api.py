@@ -22,7 +22,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .service_metrics import MetricsHandlerMixin
-from .compatibility import safe_load
+from .access import authorized, reject
+from .compatibility import model_identity, safe_load
+from .loaded import LoadedModels, ReportError
 from .registry import AmbiguousModelError, RegistryError, duplicate_versions, find_latest, load_registry
 
 
@@ -54,6 +56,14 @@ def _query_params(handler: BaseHTTPRequestHandler) -> dict[str, str]:
     return {key: value[0] for key, value in values.items()}
 
 
+# largest body of POST /models/loaded (a node name and the identity of one model)
+REPORT_BODY_BYTES = 2048
+
+
+def _reject_constant(name: str) -> float:
+    raise ValueError(f"{name} is not a valid JSON number")
+
+
 class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
     server: "RegistryServer"
     metrics_service = "hydra-umc-detection-hef"
@@ -68,7 +78,7 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
 
     def _load_registry(self):
         try:
-            return load_registry(self.server.registry_path, self.server.public_key_file), None
+            return load_registry(self.server.registry_path, self.server.public_key_file, self.server.require_io_contract), None
         except RegistryError as e:
             _write_error(self, 502, f"could not read registry: {e}")
             return None, "handled"
@@ -89,6 +99,8 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
             self._handle_latest(params)
         elif path == "/registry/load":
             self._handle_load(params)
+        elif path == "/models/loaded" and self.server.loaded is not None:
+            self._handle_loaded_list()
         elif path == "/stats":
             # File names only unless the server was started with --stats-full-paths: absolute paths tell a caller
             # where the host keeps its models.
@@ -118,9 +130,12 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
         if handled:
             return
         try:
-            entry = find_latest(entries, params["name"], params.get("task"), params.get("version"))
+            entry = find_latest(entries, params["name"], params.get("task"), params.get("version"), params.get("channel"))
         except AmbiguousModelError as e:
             _write_error(self, 409, str(e))
+            return
+        except RegistryError as e:
+            _write_error(self, 400, str(e))
             return
         if entry is None:
             _write_error(self, 404, f"no model named {params['name']!r}")
@@ -139,9 +154,12 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
         if handled:
             return
         try:
-            entry = find_latest(entries, params["name"], params.get("task"), params.get("version"))
+            entry = find_latest(entries, params["name"], params.get("task"), params.get("version"), params.get("channel"))
         except AmbiguousModelError as e:
             _write_error(self, 409, str(e))
+            return
+        except RegistryError as e:
+            _write_error(self, 400, str(e))
             return
         if entry is None:
             _write_error(self, 404, f"no model named {params['name']!r}")
@@ -155,7 +173,8 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
         # other registry-integrity failure in this file already gets
         # (_load_registry()'s own 502, right above).
         try:
-            result = safe_load(entry, self.server.models_dir, params["target_arch"])
+            result = safe_load(entry, self.server.models_dir, params["target_arch"],
+                               require_io_contract=self.server.require_io_contract, min_accuracy_ratio=self.server.min_accuracy_ratio)
         except RegistryError as e:
             _write_error(self, 502, f"could not safe-load model: {e}")
             return
@@ -164,15 +183,57 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
             "isReady": result.is_ready,
             "detail": result.detail,
             "entry": asdict(result.entry),
+            "identity": model_identity(result.entry),
         })
+
+    def _handle_loaded_list(self) -> None:
+        if not authorized(self, self.server.token):
+            reject(self)
+            return
+        loaded = self.server.loaded
+        assert loaded is not None
+        _write_json(self, 200, {"nodes": loaded.snapshot()})
+
+    def do_POST(self) -> None:  # noqa: N802
+        if urlparse(self.path).path != "/models/loaded" or self.server.loaded is None:
+            _write_error(self, 404, "not found")
+            return
+        if not authorized(self, self.server.token):
+            reject(self)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if not 0 < length <= REPORT_BODY_BYTES:
+                raise ValueError(f"the body must hold 1 to {REPORT_BODY_BYTES} bytes")
+            body = json.loads(self.rfile.read(length), parse_constant=_reject_constant)
+        except ValueError as error:
+            _write_error(self, 400, str(error))
+            return
+        entries, handled = self._load_registry()
+        if handled:
+            return
+        try:
+            item = self.server.loaded.record(entries, body)
+        except ReportError as error:
+            _write_error(self, 400, str(error))
+            return
+        _write_json(self, 200, item)
 
 
 class RegistryServer(ThreadingHTTPServer):
     def __init__(
         self, address: tuple[str, int], registry_path: Path, models_dir: Path | None, show_paths: bool = False,
-        public_key_file: Path | None = None,
+        public_key_file: Path | None = None, require_io_contract: bool = False, min_accuracy_ratio: float | None = None,
+        loaded: LoadedModels | None = None, token: str = "",
     ) -> None:
         super().__init__(address, Handler)
+        # an entry without an io_contract is an error (registry) and a reason to refuse a load (safe_load); off by default
+        self.require_io_contract = require_io_contract
+        # a model whose quantized score is below this share of its reference is refused (None: no such gate)
+        self.min_accuracy_ratio = min_accuracy_ratio
+        # the models nodes say they loaded (loaded.py); None leaves GET and POST /models/loaded answering 404
+        self.loaded = loaded
+        self.token = token
         self.registry_path = registry_path
         self.models_dir = models_dir
         self.show_paths = show_paths

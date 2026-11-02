@@ -293,6 +293,9 @@ usage: hydra-umc-detection-hef registry add [-h] --registry REGISTRY
                                             --classes CLASSES
                                             [--classes-sha256 CLASSES_SHA256]
                                             --hailo-arch HAILO_ARCH
+                                            [--io-contract FILE]
+                                            [--no-io-contract]
+                                            [--channel {stable,canary}]
 
 options:
   -h, --help            show this help message and exit
@@ -319,10 +322,11 @@ options:
 
 A real, brand-new registry (`registry-new.json` doesn't exist yet) plus a
 real local `.hef` file - `registry add` hashes the actual bytes, it is
-never handed a digest to trust:
+never handed a digest to trust. (The examples pass `--no-io-contract` to stay short;
+a registry that nodes will use should carry the `--io-contract` file of each model.)
 
 ```
-$ hydra-umc-detection-hef registry add --registry registry-new.json --models-dir models --hef-path pcb-defect-0.1.0.hef --name pcb-defect --version 0.1.0 --task detection --input-shape 640,640,3 --classes solder_bridge,missing_component --hailo-arch hailo8
+$ hydra-umc-detection-hef registry add --registry registry-new.json --models-dir models --hef-path pcb-defect-0.1.0.hef --name pcb-defect --version 0.1.0 --task detection --input-shape 640,640,3 --classes solder_bridge,missing_component --hailo-arch hailo8 --no-io-contract
 added pcb-defect 0.1.0 to registry-new.json (sha256=<the real sha256 of models/pcb-defect-0.1.0.hef>)
 $ echo $?
 0
@@ -345,7 +349,7 @@ Running the exact same command again is rejected - a real duplicate
 `(name, version)`, not silently overwritten or appended twice:
 
 ```
-$ hydra-umc-detection-hef registry add --registry registry-new.json --models-dir models --hef-path pcb-defect-0.1.0.hef --name pcb-defect --version 0.1.0 --task detection --input-shape 640,640,3 --classes solder_bridge,missing_component --hailo-arch hailo8
+$ hydra-umc-detection-hef registry add --registry registry-new.json --models-dir models --hef-path pcb-defect-0.1.0.hef --name pcb-defect --version 0.1.0 --task detection --input-shape 640,640,3 --classes solder_bridge,missing_component --hailo-arch hailo8 --no-io-contract
 error: entry for 'pcb-defect' '0.1.0' already exists in the registry
 $ echo $?
 1
@@ -382,7 +386,7 @@ JSON is written - there is no path where `registry add` records a
 checksum for a file that was never actually read:
 
 ```
-$ hydra-umc-detection-hef registry add --registry registry-new.json --models-dir models --hef-path nonexistent.hef --name ghost --version 1.0.0 --task detection --input-shape 640,640,3 --classes a --hailo-arch hailo8
+$ hydra-umc-detection-hef registry add --registry registry-new.json --models-dir models --hef-path nonexistent.hef --name ghost --version 1.0.0 --task detection --input-shape 640,640,3 --classes a --hailo-arch hailo8 --no-io-contract
 error: models/nonexistent.hef does not exist - add_entry() only registers a real, present file
 $ echo $?
 1
@@ -460,6 +464,26 @@ $ curl -s -w '\nHTTP:%{http_code}\n' http://127.0.0.1:8093/nope
 {"error": "not found"}
 HTTP:404
 ```
+
+### `registry record-accuracy`, `registry make-bundle`, `registry apply-bundle` and `registry rollback`
+
+`registry add` needs `--io-contract FILE` (the JSON `io_contract` block described at the end of this page) unless `--no-io-contract` is given, and takes `--channel stable|canary`.
+`--require-io-contract` (or `HYDRA_UMC_DETECTION_HEF_REQUIRE_IO_CONTRACT=1`) on `validate`, `latest`, `load` and `serve` makes an entry without a contract an error (`load` answers `REJECTED_NO_IO_CONTRACT`);
+it is off by default so that registries written before keep loading. `latest` and `load` take `--channel` (default `stable`; a pinned `--version` ignores it unless it is given).
+
+`registry record-accuracy --registry PATH --name NAME --version X.Y.Z --detections FILE --truth FILE (--reference-map N | --reference-detections FILE)` computes the mAP@0.5 of the
+detections of the compiled model against the true boxes and writes the `accuracy` block of the entry (`metric`, `quantized`, `reference`, `dataset_sha256`, `samples`); sign the registry again afterwards.
+Both files are `{"images": {"name": [{"class_id": 0, "score": 0.9, "box": {"x_min": 1, "y_min": 2, "x_max": 30, "y_max": 40}}]}}`, the truth without `score`.
+`registry load --min-accuracy-ratio R` (and `serve --min-accuracy-ratio R`) refuses with `REJECTED_ACCURACY` a model whose quantized score is under R times its reference or that has no measurement.
+
+`registry make-bundle --registry PATH --models-dir DIR --out FILE [--name NAME ...]` writes the update bundle (the signed registry, the `.hef` files of the models chosen and `bundle.json` with the SHA-256 of
+every member). `registry apply-bundle --bundle FILE --registry PATH --models-dir DIR --public-key KEY --enable-ota [--allow-downgrade]` is what a node runs: it is refused without the switch
+(`--enable-ota` or `HYDRA_UMC_DETECTION_HEF_OTA=1`) and without the public key, checks the bundle completely before it writes anything, keeps the previous registry and signature as `.prev` and
+`registry rollback --registry PATH` puts them back.
+
+`serve` also takes `--accept-loaded-reports` (off by default) and `--token-file FILE` (or `HYDRA_UMC_DETECTION_HEF_TOKEN`): with the first, `POST /models/loaded` takes
+`{"node", "model_name", "model_version", "model_sha256", "hailo_arch", "pipeline_version"?, "io_contract_sha256"?}` (at most 2048 bytes) and answers the verdict of the registry, and `GET /models/loaded`
+lists the newest report of each node. The two routes need the bearer token when one is set, and the server refuses to start with the reports on, away from loopback and without a token.
 
 ## Exit codes
 

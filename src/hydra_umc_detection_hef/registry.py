@@ -39,6 +39,12 @@ KNOWN_HAILO_ARCHS = frozenset(
 )
 
 
+# A model is published on a channel: `stable` is what a node loads unless it is told otherwise, `canary` is a candidate that
+# is tried on purpose. An entry that does not name a channel is stable.
+CHANNELS = ("stable", "canary")
+DEFAULT_CHANNEL = "stable"
+
+
 class RegistryError(ValueError):
     """Raised for a malformed registry file or entry."""
 
@@ -56,6 +62,9 @@ class ModelEntry:
     # How a consumer must prepare the input and read the output of the model (colour order, normalisation, resize,
     # box order, NMS). Optional in the registry file; when present it is validated by `validate_io_contract`.
     io_contract: dict | None = field(default=None, compare=False, hash=False)
+    channel: str = DEFAULT_CHANNEL
+    # The accuracy of the quantized model measured after compilation (see accuracy.py), optional; validated by `validate_accuracy`.
+    accuracy: dict | None = field(default=None, compare=False, hash=False)
 
     @property
     def version_tuple(self) -> tuple[int, int, int]:
@@ -77,6 +86,38 @@ _IO_CHOICES = {
     "format": ("hailo_nms_by_class", "raw_yolo"),
     "bbox_order": ("ymin,xmin,ymax,xmax", "xmin,ymin,xmax,ymax"),
 }
+
+
+_ACCURACY_KEYS = ("metric", "quantized", "reference", "dataset_sha256", "samples")
+
+
+def validate_accuracy(block: object) -> list[str]:
+    """Every problem found in an `accuracy` block (empty list: valid): the mAP@0.5 of the quantized model and of the model it came from
+    on the same validation set, the hash of that set and the number of images."""
+    if not isinstance(block, dict):
+        return ["accuracy must be a JSON object"]
+    problems = [f"accuracy: unknown key {extra!r}" for extra in sorted(set(block) - set(_ACCURACY_KEYS))]
+    problems += [f"accuracy.{key} is required" for key in _ACCURACY_KEYS if key not in block]
+    if block.get("metric", "map50") != "map50":
+        problems.append('accuracy.metric must be "map50"')
+    for key in ("quantized", "reference"):
+        if key in block and not (_is_number(block[key]) and 0.0 <= block[key] <= 1.0):
+            problems.append(f"accuracy.{key} must be a number in 0..1")
+    if _is_number(block.get("reference")) and block["reference"] <= 0:
+        problems.append("accuracy.reference must be above 0: a ratio against nothing says nothing")
+    if "dataset_sha256" in block and not (isinstance(block["dataset_sha256"], str) and re.fullmatch(r"[0-9a-f]{64}", block["dataset_sha256"])):
+        problems.append("accuracy.dataset_sha256 must be 64 lowercase hexadecimal digits")
+    samples = block.get("samples")
+    if "samples" in block and not (isinstance(samples, int) and not isinstance(samples, bool) and samples >= 1):
+        problems.append("accuracy.samples must be an integer above 0")
+    return problems
+
+
+def accuracy_ratio(entry: "ModelEntry") -> float | None:
+    """quantized / reference of the entry, or None when it has no accuracy block."""
+    if entry.accuracy is None:
+        return None
+    return float(entry.accuracy["quantized"]) / float(entry.accuracy["reference"])
 
 
 def _is_number(value: object) -> bool:
@@ -202,6 +243,16 @@ def _parse_entry(raw: object, index: int) -> ModelEntry:
             "registry-validation time rather than at deploy time on the wrong chip"
         )
 
+    channel = raw.get("channel", DEFAULT_CHANNEL)
+    if channel not in CHANNELS:
+        raise RegistryError(f"entry {index}: channel {channel!r} must be one of {list(CHANNELS)}")
+    accuracy = None
+    if "accuracy" in raw:
+        problems = validate_accuracy(raw["accuracy"])
+        if problems:
+            raise RegistryError(f"entry {index}: " + "; ".join(problems))
+        accuracy = raw["accuracy"]
+
     io_contract = None
     if "io_contract" in raw:
         problems = validate_io_contract(raw["io_contract"])
@@ -213,15 +264,17 @@ def _parse_entry(raw: object, index: int) -> ModelEntry:
         name=raw["name"], version=raw["version"], task=raw["task"],
         input_shape=input_shape, classes=classes,
         hef_path=raw["hef_path"], sha256=raw["sha256"].lower(),
-        hailo_arch=raw["hailo_arch"], io_contract=io_contract,
+        hailo_arch=raw["hailo_arch"], io_contract=io_contract, channel=channel, accuracy=accuracy,
     )
 
 
-def load_registry(path: Path, public_key_file: Path | None = None) -> list[ModelEntry]:
+def load_registry(path: Path, public_key_file: Path | None = None, require_io_contract: bool = False) -> list[ModelEntry]:
     """Parse a registry JSON file: a top-level list of model entries.
 
     With `public_key_file` the signature next to the registry (`<registry>.sig`, see signing.py) must be a valid
-    Ed25519 signature of exactly the bytes that are parsed here; without it the registry is read as before."""
+    Ed25519 signature of exactly the bytes that are parsed here; without it the registry is read as before.
+
+    With `require_io_contract` an entry without an `io_contract` is an error: a consumer cannot know how to feed such a model or read its output."""
     try:
         data = path.read_bytes()
     except OSError as exc:
@@ -236,7 +289,12 @@ def load_registry(path: Path, public_key_file: Path | None = None) -> list[Model
         raise RegistryError(f"could not read registry {path}: {exc}") from exc
     if not isinstance(raw, list):
         raise RegistryError(f"registry {path} must be a JSON array of entries")
-    return [_parse_entry(item, i) for i, item in enumerate(raw)]
+    entries = [_parse_entry(item, i) for i, item in enumerate(raw)]
+    if require_io_contract:
+        for index, entry in enumerate(entries):
+            if entry.io_contract is None:
+                raise RegistryError(f"entry {index}: {entry.name!r} {entry.version!r} has no io_contract, and this registry is read with the io_contract required")
+    return entries
 
 
 def load_registry_or_empty(path: Path) -> list[ModelEntry]:
@@ -262,6 +320,10 @@ def _entry_to_json(entry: ModelEntry) -> dict[str, object]:
     }
     if entry.io_contract is not None:
         data["io_contract"] = entry.io_contract
+    if entry.channel != DEFAULT_CHANNEL:
+        data["channel"] = entry.channel
+    if entry.accuracy is not None:
+        data["accuracy"] = entry.accuracy
     return data
 
 
@@ -344,6 +406,9 @@ def add_entry(
     classes: tuple[str, ...],
     hef_path: str,
     hailo_arch: str,
+    io_contract: dict | None = None,
+    channel: str = DEFAULT_CHANNEL,
+    require_io_contract: bool = False,
 ) -> ModelEntry:
     """Build and validate a new real entry from a real local `.hef` file -
     found while auditing the code: today the
@@ -367,7 +432,7 @@ def add_entry(
         raise RegistryError(f"{file_path} does not exist - add_entry() only registers a real, present file")
 
     sha256 = compute_sha256(file_path)
-    raw = {
+    raw: dict[str, object] = {
         "name": name,
         "version": version,
         "task": task,
@@ -377,6 +442,12 @@ def add_entry(
         "sha256": sha256,
         "hailo_arch": hailo_arch,
     }
+    if require_io_contract and io_contract is None:
+        raise RegistryError("an io_contract is required: say how the input is prepared and how the output is read")
+    if io_contract is not None:
+        raw["io_contract"] = io_contract
+    if channel != DEFAULT_CHANNEL:
+        raw["channel"] = channel
     new_entry = _parse_entry(raw, len(entries))
 
     if any(e.name == new_entry.name and e.version == new_entry.version for e in entries):
@@ -399,7 +470,7 @@ class AmbiguousModelError(RegistryError):
 
 
 def find_latest(
-    entries: list[ModelEntry], name: str, task: str | None = None, version: str | None = None
+    entries: list[ModelEntry], name: str, task: str | None = None, version: str | None = None, channel: str | None = None
 ) -> ModelEntry | None:
     """The highest-version entry matching name (and task, if given), or the
     entry of exactly `version` when one is asked for (to pin or roll back).
@@ -409,8 +480,13 @@ def find_latest(
     file" would let a bad merge of the registry deploy a different binary
     while the answer still says it is verified."""
     candidates = [e for e in entries if e.name == name and (task is None or e.task == task)]
+    if channel is not None and channel not in CHANNELS:
+        raise RegistryError(f"channel {channel!r} must be one of {list(CHANNELS)}")
     if version is not None:
         candidates = [e for e in candidates if e.version == version]
+    # without a pinned version the stable channel is the default: a canary is only chosen when it is asked for
+    if channel is not None or version is None:
+        candidates = [e for e in candidates if e.channel == (channel or DEFAULT_CHANNEL)]
     if not candidates:
         return None
     best = max(candidates, key=lambda e: e.version_tuple)
