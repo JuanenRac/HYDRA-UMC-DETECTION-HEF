@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Format-HEF-FF6F00.svg" alt="Format">
   <img src="https://img.shields.io/badge/Models-None%20yet%3A%20registry%20only-lightgrey.svg" alt="Models">
-  <img src="https://img.shields.io/badge/Tests-196%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-201%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.8-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Version | `0.1.8` |
 | Reifegrad | Funktionsfähig |
-| Tests | 196 |
+| Tests | 201 |
 | Technik | Python / Hailo SDK / HEF model registry (no model compiled yet) |
 | Ziel | Der Raspberry Pi CM5 einer HYDRA-UMC-Zelle |
 | Auf echter Hardware | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
@@ -51,7 +51,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel sagt, wie weit er heut
 | Bereich | Stand | Was das hier bedeutet |
 |---|---|---|
 | Software | 🟡 | Funktioniert für seinen Hauptzweck; die Ehrlichkeitsprüfung oben nennt, was noch fehlt |
-| Tests | 🟢 | 196 automatische Tests, bei jeder Änderung ausgeführt |
+| Tests | 🟢 | 201 automatische Tests, bei jeder Änderung ausgeführt |
 | Echte Hardware | 🔴 | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
 | Schnittstelle und Protokolle | 🟡 | Die angebotenen Routen oder Nachrichten sind dokumentiert und mit einem Client getestet; noch nicht jeder Client hat sie benutzt |
 | Integration | 🟠 | Es läuft zusammen mit den anderen Diensten auf dem CM5-Prüfstand, und seine Nachrichten folgen den gemeinsamen Verträgen des SDK |
@@ -129,7 +129,7 @@ Das obige Diagramm legt die geplante Pipeline-Form bereits fest: PyTorch/YOLO-Tr
 * 🔐 **Geprüfte Bytes:** `safe_load(..., keep_bytes=True)` liest die Datei einmal, prüft ihr SHA-256 und liefert genau diese Bytes zurück, sodass ein Verbraucher, der das Modell daraus baut (der Vision-Streamer und die Visual-Servoing-API tun das), keine Datei untergeschoben bekommt, die sich nach der Prüfung geändert hat. `GET /stats` zeigt Dateinamen statt absoluter Pfade, außer mit `serve --stats-full-paths`.
 * 🩺 **Ein einheitliches `GET /health`, standardmäßig geschlossen:** `serve --health-open` (oder `HYDRA_UMC_DETECTION_HEF_HEALTH_OPEN=1`) lässt den Dienst auf `GET /health` mit `{"status": "ok", "service": ..., "version": ...}` antworten, derselbe Inhalt in jedem Dienst der Familie; ohne den Schalter antwortet die Route mit `404` wie eine nicht vorhandene Route. Ein Aufrufer außerhalb von Loopback muss das Bearer-Token des Dienstes vorlegen, und der Inhalt enthält keinen Pfad, keine Konfiguration und kein Geheimnis.
 
-**Ehrlichkeitscheck - was heute wirklich läuft:** die reale, hardwareunabhängige Hälfte der Aufgabe dieses Projekts - das Modellregister (`registry.py`) und das echte Sicheres-Laden-Gate (`compatibility.py`), verfügbar über `registry validate`/`registry latest`/`registry load` und, als langlebige JSON/HTTP-API, über `serve` (`api.py`) - ist implementiert und getestet (196 Tests). Der ONNX-Export, die Quantisierung über den Hailo Dataflow Compiler und die HAR/HEF-Paketierung, die die von diesem Register beschriebenen Modelle tatsächlich erzeugen würden, bleiben zukünftige Arbeit: sie benötigen echte Hailo-Hardware, die diese Umgebung nicht hat. Siehe [`CHANGELOG.md`](CHANGELOG.md) für genau das, was bisher geliefert wurde, und "Aktueller Status & Nächste Schritte" unten für das, was noch offen ist.
+**Ehrlichkeitscheck - was heute wirklich läuft:** die reale, hardwareunabhängige Hälfte der Aufgabe dieses Projekts - das Modellregister (`registry.py`) und das echte Sicheres-Laden-Gate (`compatibility.py`), verfügbar über `registry validate`/`registry latest`/`registry load` und, als langlebige JSON/HTTP-API, über `serve` (`api.py`) - ist implementiert und getestet (201 Tests). Der ONNX-Export, die Quantisierung über den Hailo Dataflow Compiler und die HAR/HEF-Paketierung, die die von diesem Register beschriebenen Modelle tatsächlich erzeugen würden, bleiben zukünftige Arbeit: sie benötigen echte Hailo-Hardware, die diese Umgebung nicht hat. Siehe [`CHANGELOG.md`](CHANGELOG.md) für genau das, was bisher geliefert wurde, und "Aktueller Status & Nächste Schritte" unten für das, was noch offen ist.
 
 ## 🔒 Sicherheit und Schutz
 
@@ -177,7 +177,7 @@ Es gibt keine Umgebungsvariablen: Alles ist eine Kommandozeilenoption (`--regist
 2. **Virtuelle Umgebung** - erstellt `.venv/`, falls nicht vorhanden; verwendet es sonst weiter.
 3. **Editierbare Installation** - `pip install -e ".[dev]"`, sodass Änderungen unter `src/` sofort wirken, installiert `pytest`, und registriert den Konsolen-Einstiegspunkt `hydra-umc-detection-hef`.
 4. **Compile-Check** - `python -m compileall -q src` kompiliert jede Datei unter `src/` zu Bytecode.
-5. **Echte Test-Suite** - `python -m pytest tests/ -q` (196 Tests, die das Register, das Sicheres-Laden-Gate und die CLI abdecken).
+5. **Echte Test-Suite** - `python -m pytest tests/ -q` (201 Tests, die das Register, das Sicheres-Laden-Gate und die CLI abdecken).
 
 `set -euo pipefail` stoppt das Skript beim ersten fehlschlagenden Schritt; der Build meldet Erfolg nur, wenn alle 5 Schritte erfolgreich waren.
 
@@ -234,7 +234,7 @@ run.bat
 
 ## 🧪 Tests
 
-196 automatische Tests laufen mit `python -m pytest tests/ -q`: die Registry, das sichere Ladetor, die Kommandozeile und die HTTP-Schnittstelle. Sie brauchen keine Hailo-Werkzeuge, keine Hardware und kein äußeres Netz.
+201 automatische Tests laufen mit `python -m pytest tests/ -q`: die Registry, das sichere Ladetor, die Kommandozeile und die HTTP-Schnittstelle. Sie brauchen keine Hailo-Werkzeuge, keine Hardware und kein äußeres Netz.
 
 Die CI führt `HYDRA_UMC_CI=1 python tools/ci_validate.py` aus; das prüft das Manifest, die Dokumente, die acht READMEs und die Bilder.
 
@@ -289,7 +289,7 @@ HYDRA-UMC-DETECTION-HEF/
 
 **Bekannte Grenzen heute**
 
-**Was heute funktioniert:** das Modellregister - Schema-Validierung (einschließlich erforderlicher, validierter Hailo-Architektur-Metadaten), Erkennung doppelter Versionen, Suche nach der neuesten Version, und sha256-Integritätsprüfung (`registry.py`) - plus ein echtes, kombiniertes Sicheres-Laden-Gate, das Architektur-Kompatibilität und Checksummen-Integrität zusammen prüft und ein Modell nur dann als bereit meldet, wenn beide bestehen (`compatibility.py`), dieselben Prüfungen zusätzlich als echte, langlebige JSON/HTTP-API (`api.py`, `serve`-Unterbefehl) neben der Einmal-CLI, 196 Tests insgesamt, plus ein echtes, installierbares Python-Paket mit verifiziertem Einstiegspunkt und ein expliziter `bump`-Befehl, der die Version erhöht (der Build ändert sie nie). Siehe [`CHANGELOG.md`](CHANGELOG.md) für die erfasste Build-/Run-Ausgabe.
+**Was heute funktioniert:** das Modellregister - Schema-Validierung (einschließlich erforderlicher, validierter Hailo-Architektur-Metadaten), Erkennung doppelter Versionen, Suche nach der neuesten Version, und sha256-Integritätsprüfung (`registry.py`) - plus ein echtes, kombiniertes Sicheres-Laden-Gate, das Architektur-Kompatibilität und Checksummen-Integrität zusammen prüft und ein Modell nur dann als bereit meldet, wenn beide bestehen (`compatibility.py`), dieselben Prüfungen zusätzlich als echte, langlebige JSON/HTTP-API (`api.py`, `serve`-Unterbefehl) neben der Einmal-CLI, 201 Tests insgesamt, plus ein echtes, installierbares Python-Paket mit verifiziertem Einstiegspunkt und ein expliziter `bump`-Befehl, der die Version erhöht (der Build ändert sie nie). Siehe [`CHANGELOG.md`](CHANGELOG.md) für die erfasste Build-/Run-Ausgabe.
 
 **Was noch offen ist, ohne bestimmte Reihenfolge, ohne verbindlichen Zeitplan, und blockiert durch echte Hailo-Hardware:**
 
