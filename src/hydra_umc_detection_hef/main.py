@@ -26,6 +26,7 @@ from pathlib import Path
 from .access import bind_problem, load_token
 from .accuracy import AccuracyError, map50, record_accuracy
 from .api import RegistryServer
+from .health_route import health_open_requested
 from .bundle import apply_bundle, make_bundle, ota_enabled, rollback_registry
 from .compatibility import safe_load
 from .loaded import LoadedModels
@@ -381,6 +382,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     if reports:
         print("[detection-hef] LOADED-MODEL REPORTS ON: POST /models/loaded, GET /models/loaded" + (" (bearer token required)" if token else ""))
     try:
+        server.health_open = health_open_requested(args.health_open)
         server.serve_forever()
     except KeyboardInterrupt:
         pass
@@ -509,6 +511,7 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--registry", required=True, help="Path to the registry JSON file")
     serve.add_argument("--models-dir", default=None, help="Directory containing the .hef files, needed for GET /registry/load")
     serve.add_argument("--addr", default="127.0.0.1", help="address to bind the HTTP API to")
+    serve.add_argument("--health-open", action="store_true", help="answer GET /health (open to loopback, to other callers only with the bearer token); closed by default, or set HYDRA_UMC_DETECTION_HEF_HEALTH_OPEN=1")
     serve.add_argument("--port", type=int, default=8093, help="port for the HTTP API")
     serve.add_argument("--stats-full-paths", action="store_true", help="let GET /stats show absolute paths instead of file names")
     serve.add_argument("--public-key", default=None, help="Ed25519 public key file; when set (or in HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE) the registry must carry a valid <registry>.sig")

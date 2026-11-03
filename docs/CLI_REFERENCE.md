@@ -523,3 +523,10 @@ A registry entry may carry an `io_contract` block that says how a consumer must 
 - `input.normalization`: `"on-chip"` (the model normalises) or `{"mean": [...], "std": [...]}` with the same length and `std` above 0.
 - `output.format`: `hailo_nms_by_class` (the NMS runs in the HEF and returns, per class, `[ymin, xmin, ymax, xmax, score]` normalised to 0..1 when `bbox_normalized` is true) or `raw_yolo`. `bbox_order`: `ymin,xmin,ymax,xmax` or `xmin,ymin,xmax,ymax`. `max_detections_per_class` is an integer above 0; `score_threshold` and `iou_threshold` are in 0..1.
 - Unknown keys are rejected, so a typo does not silently disappear.
+
+
+## `GET /health` (off by default)
+
+A uniform health route, the same in every service of the family. It is closed unless the operator opens it with `serve --health-open` or `HYDRA_UMC_DETECTION_HEF_HEALTH_OPEN=1`: closed, it answers `404 {"error": "not found"}` like any route that does not exist.
+
+Open, it answers `200` with `{"status": "ok", "service": "hydra-umc-detection-hef", "version": "<version>"}` to a caller on loopback. A caller that is not on loopback must present the bearer token of the service (a service started without a token never answers one). The body never carries a path, a setting or a secret. The health path of the project manifest (`health_path`) is unchanged.

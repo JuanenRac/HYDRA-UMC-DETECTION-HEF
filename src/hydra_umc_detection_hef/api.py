@@ -21,6 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from .health_route import HealthRouteMixin
 from .service_metrics import MetricsHandlerMixin
 from .access import authorized, reject
 from .compatibility import model_identity, safe_load
@@ -64,7 +65,7 @@ def _reject_constant(name: str) -> float:
     raise ValueError(f"{name} is not a valid JSON number")
 
 
-class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
+class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
     server: "RegistryServer"
     metrics_service = "hydra-umc-detection-hef"
 
@@ -84,6 +85,8 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
             return None, "handled"
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.serve_health(self.server.token):
+            return
         if self.serve_metrics():
             return
         path = urlparse(self.path).path
