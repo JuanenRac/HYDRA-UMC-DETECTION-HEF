@@ -224,6 +224,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 
 
 class RegistryServer(ThreadingHTTPServer):
+    health_open: bool = False  # GET /health answers only when the operator opens it (health_route.py)
     def __init__(
         self, address: tuple[str, int], registry_path: Path, models_dir: Path | None, show_paths: bool = False,
         public_key_file: Path | None = None, require_io_contract: bool = False, min_accuracy_ratio: float | None = None,
