@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Bench test script:** `docs/BENCH_TESTS.md` lists the checks of the measured accuracy and the signed bundles that need a compiled model and an accelerator, all marked not executed.
+
 ## [0.1.8] - The decoded detections as the DetectionFrame of the SDK, an io_contract required when a model is added, channels and a trace of the loaded model, accuracy measured after compilation and signed bundles of models for an update over the air, the last two off by default
 
 - **The decoded detections as the `DetectionFrame` of the SDK contract:** `decoder.detection_frame(detections, frame_id=..., capture_ts_utc=..., frame_size=(w, h), model=..., session_id=..., box_unit="pixel"|"normalized")` builds the closed message (`schema_version` "1.0", boxes by `x_min`, `y_min`, `x_max`, `y_max` with the origin at the top left, one `class_id`, `label` and `score` each, the identity of the model when given). `Detection.as_dict`, with its camelCase names, is unchanged for whoever reads it. A test runs the SDK validator over the message when the SDK checkout is next to this repository.
