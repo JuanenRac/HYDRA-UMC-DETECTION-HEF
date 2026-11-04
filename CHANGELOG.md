@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The manifest declares the uniform `GET /health` route:** `service.health_path` is `/health` now. The route stays closed (404) until the service switch opens it, and the health checks of the server and of the family ask `/stats` after a 404 on `/health`.
+
 ## [0.1.9] - Sign the registry as it is written: registry add and registry record-accuracy take --sign-with PRIVATEKEY (or HYDRAUMCDETECTIONHEFSIGNINGKEYFILE) and write <registry>.sig right after the registry changes, so the model build... (and 2 more changes)
 
 - **Sign the registry as it is written:** `registry add` and `registry record-accuracy` take `--sign-with PRIVATE_KEY` (or `HYDRA_UMC_DETECTION_HEF_SIGNING_KEY_FILE`) and write `<registry>.sig` right after the registry changes, so the model build flow never leaves a stale signature. Off unless a key is given; a key that cannot be read is an error.
