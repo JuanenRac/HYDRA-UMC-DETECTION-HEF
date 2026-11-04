@@ -25,5 +25,8 @@
     "port": 8093,
     "systemd_unit": "hydra-umc-detection-hef.service",
     "health_path": "/health"
-  }
+  },
+  "depends_on": [
+    "HYDRA-UMC-VISION-NODE"
+  ]
 }
