@@ -100,3 +100,34 @@ def test_the_command_line_signs_verifies_and_refuses_a_tampered_registry(tmp_pat
     registry.write_text(registry.read_text(encoding="utf-8") + " ", encoding="utf-8")
     bad = run_cli("registry", "validate", "--registry", str(registry), "--public-key", str(public))
     assert bad.returncode == 1 and "does not match" in bad.stderr
+
+
+def _add_args(tmp_path, registry, *extra):
+    models = tmp_path / "models"
+    models.mkdir(exist_ok=True)
+    (models / "m.hef").write_bytes(b"hef bytes")
+    return ["registry", "add", "--registry", str(registry), "--models-dir", str(models), "--hef-path", "m.hef",
+            "--name", "m", "--version", "0.1.0", "--task", "detection", "--input-shape", "64,64,3",
+            "--classes", "a", "--hailo-arch", "hailo8", "--no-io-contract", *extra]
+
+
+def test_add_with_sign_with_leaves_a_registry_a_node_accepts(tmp_path):
+    private, public = _keys(tmp_path)
+    registry = tmp_path / "registry.json"
+    result = run_cli(*_add_args(tmp_path, registry, "--sign-with", str(private)))
+    assert result.returncode == 0, result.stderr
+    assert "signed" in result.stdout
+    assert len(load_registry(registry, public)) == 1
+
+
+def test_add_without_a_key_does_not_sign(tmp_path):
+    registry = tmp_path / "registry.json"
+    result = run_cli(*_add_args(tmp_path, registry))
+    assert result.returncode == 0, result.stderr
+    assert not (tmp_path / "registry.json.sig").exists()
+
+
+def test_add_with_an_unreadable_key_fails_instead_of_leaving_a_stale_signature(tmp_path):
+    registry = tmp_path / "registry.json"
+    result = run_cli(*_add_args(tmp_path, registry, "--sign-with", str(tmp_path / "missing.key")))
+    assert result.returncode != 0

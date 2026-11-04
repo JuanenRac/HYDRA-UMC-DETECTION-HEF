@@ -46,7 +46,7 @@ from .registry import (
     verify_checksum,
     write_registry,
 )
-from .signing import generate_keypair, resolve_public_key, sign_registry
+from .signing import SIGNING_KEY_ENV, generate_keypair, resolve_public_key, sign_registry
 
 PROJECT_NAME = "HYDRA-UMC-DETECTION-HEF"
 DIST_NAME = "hydra-umc-detection-hef"
@@ -190,6 +190,14 @@ def _cmd_registry_load(args: argparse.Namespace) -> int:
     return 1
 
 
+def _sign_after_write(args: argparse.Namespace, registry_path: Path) -> None:
+    """Sign the registry again right after a command rewrote it, when the private key was given (--sign-with or the environment)."""
+    key = getattr(args, "sign_with", None) or os.environ.get(SIGNING_KEY_ENV) or None
+    if key:
+        target = sign_registry(registry_path, Path(key))
+        print(f"signed {registry_path} -> {target}")
+
+
 def _cmd_registry_add(args: argparse.Namespace) -> int:
     registry_path = Path(args.registry)
     try:
@@ -258,6 +266,7 @@ def _registry_add_locked(args: argparse.Namespace, registry_path: Path) -> int:
 
     entries.append(new_entry)
     write_registry(registry_path, entries)
+    _sign_after_write(args, registry_path)
     print(f"added {new_entry.name} {new_entry.version} to {registry_path} (sha256={new_entry.sha256})")
     return 0
 
@@ -314,6 +323,7 @@ def _cmd_registry_record_accuracy(args: argparse.Namespace) -> int:
             reference = args.reference_map if args.reference_map is not None else map50(_read_json(args.reference_detections, "the reference detections file"), truth)
             updated = record_accuracy(entry, quantized, reference)
             write_registry(registry_path, [updated if e is entry else e for e in entries])
+            _sign_after_write(args, registry_path)
     except (RegistryError, AccuracyError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -454,6 +464,7 @@ def _build_parser() -> argparse.ArgumentParser:
     add.add_argument("--io-contract", default=None, metavar="FILE", help="JSON file with the io_contract of the model (how the input is prepared and how the output is read); required unless --no-io-contract")
     add.add_argument("--no-io-contract", action="store_true", dest="no_io_contract", help="Add the model without an io_contract (a node that requires one will refuse it)")
     add.add_argument("--channel", choices=CHANNELS, default=DEFAULT_CHANNEL, help="Channel the model is published on (default: stable)")
+    add.add_argument("--sign-with", default=None, metavar="PRIVATE_KEY", dest="sign_with", help="Ed25519 private key file: sign the registry again as soon as it is written (or HYDRA_UMC_DETECTION_HEF_SIGNING_KEY_FILE); keep that key on the build machine, never on a node")
     add.set_defaults(func=_cmd_registry_add)
 
     accuracy = registry_sub.add_parser("record-accuracy", help="Measure the mAP@0.5 of the quantized model from its detections and the true boxes, and record it in the entry.")
@@ -465,6 +476,7 @@ def _build_parser() -> argparse.ArgumentParser:
     accuracy.add_argument("--truth", required=True, help="JSON file with the true boxes of the same images")
     accuracy.add_argument("--reference-map", type=float, default=None, dest="reference_map", help="mAP@0.5 of the model before quantization on the same images")
     accuracy.add_argument("--reference-detections", default=None, dest="reference_detections", help="Detections of the model before quantization on the same images (instead of --reference-map)")
+    accuracy.add_argument("--sign-with", default=None, metavar="PRIVATE_KEY", dest="sign_with", help="Ed25519 private key file: sign the registry again as soon as it is written (or HYDRA_UMC_DETECTION_HEF_SIGNING_KEY_FILE); keep that key on the build machine, never on a node")
     accuracy.set_defaults(func=_cmd_registry_record_accuracy)
 
     pack = registry_sub.add_parser("make-bundle", help="Pack the signed registry and the .hef files into one bundle for the nodes.")

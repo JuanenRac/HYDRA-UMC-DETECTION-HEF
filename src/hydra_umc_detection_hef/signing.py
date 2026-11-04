@@ -22,6 +22,7 @@ from pathlib import Path
 from .registry import RegistryError
 
 PUBLIC_KEY_ENV = "HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE"
+SIGNING_KEY_ENV = "HYDRA_UMC_DETECTION_HEF_SIGNING_KEY_FILE"
 SIGNATURE_SUFFIX = ".sig"
 
 

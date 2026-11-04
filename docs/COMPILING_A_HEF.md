@@ -64,6 +64,11 @@ Compiler you install.
 
    Only `READY` means the checksum and the architecture both match.
 
+6. Sign the registry on the machine that builds models. Give `--sign-with PRIVATE_KEY` (or set
+   `HYDRA_UMC_DETECTION_HEF_SIGNING_KEY_FILE`) to `registry add` and to `registry record-accuracy` and the signature is
+   written again as soon as the registry changes, so a stale `registry.json.sig` is never left behind. The private key
+   stays on that machine; a node only holds the public key.
+
 ## Keep a record
 
 Write down, next to the model, the ONNX file and its hash, the DFC version,

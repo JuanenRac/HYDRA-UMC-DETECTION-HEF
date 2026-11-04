@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Sign the registry as it is written:** `registry add` and `registry record-accuracy` take `--sign-with PRIVATE_KEY` (or `HYDRA_UMC_DETECTION_HEF_SIGNING_KEY_FILE`) and write `<registry>.sig` right after the registry changes, so the model build flow never leaves a stale signature. Off unless a key is given; a key that cannot be read is an error.
+
 - **A uniform `GET /health`, closed by default:** `serve --health-open` (or `HYDRA_UMC_DETECTION_HEF_HEALTH_OPEN=1`) makes the service answer `GET /health` with `{"status": "ok", "service": ..., "version": ...}`, the same body in every service of the family, so a watchdog reads the health of any of them the same way. Without the switch the route answers `404` like a route that does not exist. A caller that is not on loopback must present the bearer token of the service (a service started without a token never answers one). The body carries no path, configuration or secret; the health path the manifest declares does not change.
 
 - **Bench test script:** `docs/BENCH_TESTS.md` lists the checks of the measured accuracy and the signed bundles that need a compiled model and an accelerator, all marked not executed.
