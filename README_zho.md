@@ -134,6 +134,7 @@ INT8/INT4 量化（生成 `.har`），最后打包为 [HYDRA-UMC-VISION-NODE](ht
 * 📨 **SDK 契约中的检测结果：** `decoder.detection_frame` 把解码后的检测结果转成视觉节点以及安全和伺服服务读取的 `DetectionFrame` 消息（像素或归一化的角点框、帧、采集时刻和模型身份）；旧的 `Detection.as_dict` 保持不变。
 * 🔐 **已验证的字节:** `safe_load(..., keep_bytes=True)` 只读取文件一次，检查其 SHA-256，并原样返回这些字节；因此用这些字节构建模型的使用方(视觉推流器和视觉伺服 API 就是这样做的)不会拿到校验之后又被改动的文件。`GET /stats` 只显示文件名而不是绝对路径，除非加上 `serve --stats-full-paths`。
 * 🩺 **统一的 `GET /health`，默认关闭：** `serve --health-open`（或 `HYDRA_UMC_DETECTION_HEF_HEALTH_OPEN=1`）使服务以 `{"status": "ok", "service": ..., "version": ...}` 响应 `GET /health`，家族中每个服务的响应体相同；没有该开关时，该路由像不存在的路由一样返回 `404`。非回环地址的调用方必须出示服务的 bearer 令牌，响应体不含路径、配置或密钥。
+* 🪪 **HYDRA-UMC-SERVER 的身份（默认关闭）：** `serve --identity-key-file 文件`（或 `HYDRA_UMC_DETECTION_HEF_IDENTITY_KEY_FILE=文件`）会让服务在自己的令牌之外，也接受服务器在登录时签发的已签名令牌：查看者只能读取而不能更改，没有凭据的请求即使在环回地址上也会被拒绝。不开启该开关时一切照旧。
 
 **诚实说明——今天实际运行的内容：** 本项目工作中真实、独立于硬件的那一半——模型注册表（`registry.py`）和真实的安全加载关卡（`compatibility.py`）——通过 `registry validate`/`registry latest`/`registry load`，以及作为长期运行 JSON/HTTP API 的 `serve`（`api.py`）暴露，已经实现并经过测试（201 个测试）。而真正*生产*这些注册表所描述模型的 ONNX 导出、Hailo Dataflow Compiler 量化和 HAR/HEF 打包步骤仍是未来工作：它们都需要本环境不具备的真实 Hailo 硬件。具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，尚待完成的
 内容请参见下方"当前状态与后续步骤"章节。

@@ -87,6 +87,9 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         if self.serve_health(self.server.token):
             return
+        if not authorized(self, self.server.token, self.server.identity_key) and self.server.identity_key is not None:
+            reject(self)  # with the identity of HYDRA-UMC-SERVER on, nothing is open, /stats and /metrics included
+            return
         if self.serve_metrics():
             return
         path = urlparse(self.path).path
@@ -190,7 +193,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
         })
 
     def _handle_loaded_list(self) -> None:
-        if not authorized(self, self.server.token):
+        if not authorized(self, self.server.token, self.server.identity_key):
             reject(self)
             return
         loaded = self.server.loaded
@@ -201,7 +204,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
         if urlparse(self.path).path != "/models/loaded" or self.server.loaded is None:
             _write_error(self, 404, "not found")
             return
-        if not authorized(self, self.server.token):
+        if not authorized(self, self.server.token, self.server.identity_key):
             reject(self)
             return
         try:
@@ -225,6 +228,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 
 class RegistryServer(ThreadingHTTPServer):
     health_open: bool = False  # GET /health answers only when the operator opens it (health_route.py)
+    identity_key: bytes | None = None  # the signing key of HYDRA-UMC-SERVER, when the operator turned its identity on (server_identity.py)
     def __init__(
         self, address: tuple[str, int], registry_path: Path, models_dir: Path | None, show_paths: bool = False,
         public_key_file: Path | None = None, require_io_contract: bool = False, min_accuracy_ratio: float | None = None,

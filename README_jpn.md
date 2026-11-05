@@ -141,6 +141,7 @@ ONNX にエクスポートされ、Hailo Dataflow Compiler を通じて INT8/INT
 * 📨 **SDK 契約の検出結果：** `decoder.detection_frame` はデコードした検出結果を、ビジョンノードや安全・サーボのサービスが読む `DetectionFrame` メッセージ（ピクセルまたは正規化した角座標のボックス、フレーム、撮影時刻、モデルの識別情報）に変換します。従来の `Detection.as_dict` は変更ありません。
 * 🔐 **検証済みバイト列:** `safe_load(..., keep_bytes=True)` はファイルを一度だけ読み、SHA-256 を確認して、そのバイト列をそのまま返します。これらからモデルを組み立てる側(ビジョンストリーマーとビジュアルサーボ API がそうします)は、確認後に変わったファイルを渡されることがありません。`GET /stats` は絶対パスではなくファイル名を示します(`serve --stats-full-paths` を付けた場合を除く)。
 * 🩺 **統一された `GET /health`（既定では閉じています）：** `serve --health-open`（または `HYDRA_UMC_DETECTION_HEF_HEALTH_OPEN=1`）を指定すると、サービスは `GET /health` に `{"status": "ok", "service": ..., "version": ...}` で応答します。ファミリーのすべてのサービスで同じ本文です。スイッチがなければ、ルートは存在しないルートと同じく `404` を返します。ループバック以外の呼び出し元はサービスのベアラートークンが必要で、本文にはパス・設定・秘密情報は含まれません。
+* 🪪 **HYDRA-UMC-SERVER の ID（既定ではオフ）:** `serve --identity-key-file FILE`（または `HYDRA_UMC_DETECTION_HEF_IDENTITY_KEY_FILE=FILE`）を指定すると、サービスは自身のトークンに加えて、サーバーがログイン時に発行する署名付きトークンを受け付けます。閲覧者は読み取りだけで変更はできず、資格情報のないリクエストはループバックでも拒否されます。スイッチがなければ何も変わりません。
 
 **正直な現状確認 —— 今日実際に動くもの：** 本プロジェクトの仕事のうち、実際にハードウェアに依存しない半分——モデルレジストリ（`registry.py`）と実際の安全なロードのゲート（`compatibility.py`）——は、`registry validate`/`registry latest`/`registry load`、および長時間稼働する JSON/HTTP API としての `serve`（`api.py`）を通じて公開され、実装され、テストされています（201 個のテスト）。このレジストリが記述するモデルを実際に*生成*する ONNX エクスポート、Hailo Dataflow Compiler による量子化、HAR/HEF パッケージングは、依然として将来の作業です：いずれもこの環境にはない実際の Hailo ハードウェアを必要とします。
 実際に出荷済みの内容は [`CHANGELOG.md`](CHANGELOG.md) を、まだ残っている
