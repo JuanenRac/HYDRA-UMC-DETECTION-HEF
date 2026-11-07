@@ -28,6 +28,7 @@ from .accuracy import AccuracyError, map50, record_accuracy
 from .api import RegistryServer
 from .health_route import health_open_requested
 from .server_identity import identity_key_from
+from .settings_file import RuntimeSettings, settings_path_from
 from .bundle import apply_bundle, make_bundle, ota_enabled, rollback_registry
 from .compatibility import safe_load
 from .loaded import LoadedModels
@@ -390,6 +391,10 @@ def _cmd_serve(args: argparse.Namespace) -> int:
                             public_key_file=resolve_public_key(args.public_key), require_io_contract=_require_io(args), min_accuracy_ratio=ratio,
                             loaded=LoadedModels() if reports else None, token=token)
     server.identity_key = identity_key
+    settings_path = settings_path_from(getattr(args, "settings_file", None))
+    if settings_path is not None:
+        server.settings = RuntimeSettings(settings_path, flag=reports)
+        print(f"[detection-hef] loaded-model reports follow {settings_path.name} (re-read while running; a file that cannot be trusted turns them off)")
     print(f"[detection-hef] HTTP API listening on {args.addr}:{args.port} (registry={args.registry})")
     print("[detection-hef] GET /registry, GET /registry/latest, GET /registry/load, GET /stats" + ("; tokens of HYDRA-UMC-SERVER accepted, nothing is open" if identity_key is not None else ""))
     if reports:
@@ -533,6 +538,7 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--require-io-contract", action="store_true", dest="require_io_contract", help="Treat an entry without an io_contract as an error and refuse to load one (off by default)")
     serve.add_argument("--min-accuracy-ratio", type=float, default=None, dest="min_accuracy_ratio", help="Refuse to load a model whose quantized mAP@0.5 is below this share (above 0, at most 1) of its reference, or that has no measurement (off by default)")
     serve.add_argument("--accept-loaded-reports", action="store_true", dest="accept_loaded_reports", help="Turn on POST and GET /models/loaded (off by default): the nodes say which model they loaded and get a verdict against the registry")
+    serve.add_argument("--settings-file", default=None, dest="settings_file", help="JSON file {\"acceptLoadedReports\": true|false} that HYDRA-UMC-SERVER writes and this process re-reads while it runs, to turn the loaded-model reports on and off without a restart (off by default; or set HYDRA_UMC_DETECTION_HEF_SETTINGS_FILE); a missing file leaves --accept-loaded-reports in force, a broken file turns the reports off")
     serve.add_argument("--identity-key-file", default=None, help="file with the signing key of HYDRA-UMC-SERVER (its JWT_SECRET): a valid token of the SERVER is then accepted, every route (GET /health and GET /stats too) demands an identity and a viewer may read but not change (off by default; or set HYDRA_UMC_DETECTION_HEF_IDENTITY_KEY_FILE)")
     serve.add_argument("--token-file", default=None, help="File with the bearer token the /models/loaded routes need (or HYDRA_UMC_DETECTION_HEF_TOKEN); required to bind an address that is not loopback with the reports on")
     serve.set_defaults(func=_cmd_serve)

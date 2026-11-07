@@ -485,6 +485,8 @@ every member). `registry apply-bundle --bundle FILE --registry PATH --models-dir
 `{"node", "model_name", "model_version", "model_sha256", "hailo_arch", "pipeline_version"?, "io_contract_sha256"?}` (at most 2048 bytes) and answers the verdict of the registry, and `GET /models/loaded`
 lists the newest report of each node. The two routes need the bearer token when one is set, and the server refuses to start with the reports on, away from loopback and without a token.
 
+`serve --settings-file FILE` (or `HYDRA_UMC_DETECTION_HEF_SETTINGS_FILE`; off by default) lets HYDRA-UMC-SERVER switch those reports while the service runs. The file is a JSON object, at most 4096 bytes, `{"acceptLoadedReports": true}`; the service looks at it again when its size or modification time changes (at most once per second). A file that does not exist leaves `--accept-loaded-reports` in force; a file that is not a regular file, is too large, is not UTF-8 JSON, is not an object or whose `acceptLoadedReports` is not `true` or `false` turns the reports off until it is fixed. A `true` away from loopback is refused unless a bearer token or the identity of the SERVER protects the routes. Turning the reports off forgets what the nodes reported, and while they are off both routes answer `404`.
+
 ## Exit codes
 
 | Code | Meaning |

@@ -140,6 +140,7 @@ INT8/INT4 量化（生成 `.har`），最后打包为 [HYDRA-UMC-VISION-NODE](ht
 内容请参见下方"当前状态与后续步骤"章节。
 
 编译模型（ONNX，然后经 Hailo Dataflow Compiler，最后得到 `.hef`）在安装了 Dataflow Compiler 的 x86_64 Linux 主机上进行，并需要用于量化的校准数据集，不需要 Hailo-8 本身。只有运行编译后的模型才需要加速器。`registry load` 和 `GET /registry/load` 会拒绝有歧义的注册表（相同名称和版本对应不同文件），接受设备所报告的架构写法（`HAILO8`），并可用 `--version` / `?version=` 固定确切版本；`registry add` 已串行化，同时添加不会丢失条目。在开发板上，模型位于 `/opt/hydra-umc/detection-hef/models`。
+* 🔀 **在服务运行时开关已加载模型报告（默认关闭）：** `serve --settings-file FILE`（或 `HYDRA_UMC_DETECTION_HEF_SETTINGS_FILE=FILE`）指定一个小型 JSON 文件 `{"acceptLoadedReports": true}`，由 HYDRA-UMC-SERVER 写入，服务在其变化时重新读取，因此切换 `--accept-loaded-reports` 不再需要重启。文件不存在时沿用启动选项；无法信任的文件会关闭报告，并且在没有令牌或 SERVER 身份时，该文件不能在非回环地址上打开报告。关闭时，已报告的内容会被清除。
 
 ## 🔒 安全与防护
 

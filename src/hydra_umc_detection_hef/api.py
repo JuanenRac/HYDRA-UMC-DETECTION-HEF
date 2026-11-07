@@ -16,6 +16,7 @@ this is real, occasionally-updated bookkeeping, not a hot path.
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -23,9 +24,10 @@ from urllib.parse import parse_qs, urlparse
 
 from .health_route import HealthRouteMixin
 from .service_metrics import MetricsHandlerMixin
-from .access import authorized, reject
+from .access import authorized, bind_problem, reject
 from .compatibility import model_identity, safe_load
 from .loaded import LoadedModels, ReportError
+from .settings_file import RuntimeSettings
 from .registry import AmbiguousModelError, RegistryError, duplicate_versions, find_latest, load_registry
 
 
@@ -105,7 +107,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             self._handle_latest(params)
         elif path == "/registry/load":
             self._handle_load(params)
-        elif path == "/models/loaded" and self.server.loaded is not None:
+        elif path == "/models/loaded" and self.server.reports() is not None:
             self._handle_loaded_list()
         elif path == "/stats":
             # File names only unless the server was started with --stats-full-paths: absolute paths tell a caller
@@ -196,12 +198,15 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
         if not authorized(self, self.server.token, self.server.identity_key):
             reject(self)
             return
-        loaded = self.server.loaded
-        assert loaded is not None
+        loaded = self.server.reports()
+        if loaded is None:  # the settings file turned the reports off between the routing and here
+            _write_error(self, 404, "not found")
+            return
         _write_json(self, 200, {"nodes": loaded.snapshot()})
 
     def do_POST(self) -> None:  # noqa: N802
-        if urlparse(self.path).path != "/models/loaded" or self.server.loaded is None:
+        loaded = self.server.reports()
+        if urlparse(self.path).path != "/models/loaded" or loaded is None:
             _write_error(self, 404, "not found")
             return
         if not authorized(self, self.server.token, self.server.identity_key):
@@ -219,7 +224,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
         if handled:
             return
         try:
-            item = self.server.loaded.record(entries, body)
+            item = loaded.record(entries, body)
         except ReportError as error:
             _write_error(self, 400, str(error))
             return
@@ -229,6 +234,23 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 class RegistryServer(ThreadingHTTPServer):
     health_open: bool = False  # GET /health answers only when the operator opens it (health_route.py)
     identity_key: bytes | None = None  # the signing key of HYDRA-UMC-SERVER, when the operator turned its identity on (server_identity.py)
+    settings: RuntimeSettings | None = None  # the settings file that switches the reports while the service runs (settings_file.py)
+
+    def reports(self) -> LoadedModels | None:
+        """The store of loaded-model reports when they are on right now, else None (the routes then answer 404).
+
+        Without a settings file this is the store made at start. With one, the file decides on every call: turning the reports off forgets what was
+        reported, and turning them on away from loopback is refused unless a token or the identity of the SERVER protects the routes."""
+        if self.settings is None:
+            return self.loaded
+        with self._reports_lock:
+            on = self.settings.accept_loaded_reports() and not (bind_problem(str(self.server_address[0]), self.token) and self.identity_key is None)
+            if not on:
+                self.loaded = None
+            elif self.loaded is None:
+                self.loaded = LoadedModels()
+            return self.loaded
+
     def __init__(
         self, address: tuple[str, int], registry_path: Path, models_dir: Path | None, show_paths: bool = False,
         public_key_file: Path | None = None, require_io_contract: bool = False, min_accuracy_ratio: float | None = None,
@@ -241,6 +263,7 @@ class RegistryServer(ThreadingHTTPServer):
         self.min_accuracy_ratio = min_accuracy_ratio
         # the models nodes say they loaded (loaded.py); None leaves GET and POST /models/loaded answering 404
         self.loaded = loaded
+        self._reports_lock = threading.Lock()
         self.token = token
         self.registry_path = registry_path
         self.models_dir = models_dir

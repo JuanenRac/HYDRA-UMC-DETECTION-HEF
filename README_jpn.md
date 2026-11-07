@@ -146,6 +146,7 @@ ONNX にエクスポートされ、Hailo Dataflow Compiler を通じて INT8/INT
 **正直な現状確認 —— 今日実際に動くもの：** 本プロジェクトの仕事のうち、実際にハードウェアに依存しない半分——モデルレジストリ（`registry.py`）と実際の安全なロードのゲート（`compatibility.py`）——は、`registry validate`/`registry latest`/`registry load`、および長時間稼働する JSON/HTTP API としての `serve`（`api.py`）を通じて公開され、実装され、テストされています（209 個のテスト）。このレジストリが記述するモデルを実際に*生成*する ONNX エクスポート、Hailo Dataflow Compiler による量子化、HAR/HEF パッケージングは、依然として将来の作業です：いずれもこの環境にはない実際の Hailo ハードウェアを必要とします。
 実際に出荷済みの内容は [`CHANGELOG.md`](CHANGELOG.md) を、まだ残っている
 作業は下記の「現在の状況と次のステップ」セクションを参照してください。
+* 🔀 **サービス稼働中に読み込み済みモデルの報告をオン・オフする（既定はオフ）:** `serve --settings-file FILE`（または `HYDRA_UMC_DETECTION_HEF_SETTINGS_FILE=FILE`）で小さなJSONファイル `{"acceptLoadedReports": true}` を指定します。HYDRA-UMC-SERVER がこれを書き込み、サービスは変更されると再読み込みするため、`--accept-loaded-reports` の切り替えに再起動は不要です。ファイルがなければ起動時の指定が有効で、信頼できないファイルは報告をオフにし、トークンまたはSERVERのIDなしにループバック以外で報告をオンにすることはできません。オフにすると、それまでの報告は破棄されます。
 
 ## 🔒 セキュリティと安全
 

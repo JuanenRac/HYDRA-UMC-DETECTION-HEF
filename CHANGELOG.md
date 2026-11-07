@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The loaded-model reports can be switched while the service runs (`serve --settings-file FILE`, or `HYDRA_UMC_DETECTION_HEF_SETTINGS_FILE`, off by default):** the server writes a small JSON file `{"acceptLoadedReports": true}` and the service looks at it again when it changes, so turning `POST` and `GET /models/loaded` on or off no longer needs a restart. A missing file leaves `--accept-loaded-reports` in force; a file that cannot be trusted (not a regular file, over 4096 bytes, not JSON, not an object, a value that is not a true boolean) turns the reports off, and a `true` away from loopback is refused without a token or the identity of the server. Turning the reports off forgets what was reported.
+
 ## [0.2.0] - The build test of the repository compiles only on CI or when allowed: for the stacks that compile (rust, go, android, flutter, firmware-c), tools/buildtest.py prints BUILDTEST=SKIPPED with exit status 2 on a plain PC, never a... (and 2 more changes)
 
 - **The build test of the repository compiles only on CI or when allowed:** for the stacks that compile (`rust`, `go`, `android`, `flutter`, `firmware-c`), `tools/build_test.py` prints `BUILD_TEST=SKIPPED` with exit status 2 on a plain PC, never a pass; `ALLOW_LOCAL_BUILD=1` allows it and a CI runner always may. The `python` and `node` stacks are not locked.
