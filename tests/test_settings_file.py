@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -147,3 +148,113 @@ def test_the_file_cannot_open_the_routes_away_from_loopback_without_a_token(tmp_
         assert server.reports() is not None
     finally:
         server.server_close()
+
+
+# -- edge cases and a seeded fuzz of the settings file ------------------------------------------------------
+
+
+def test_a_file_of_exactly_the_largest_size_is_still_read(tmp_path: Path) -> None:
+    path = tmp_path / "s.json"
+    body = '{"acceptLoadedReports": true' + " " * (MAX_BYTES - len('{"acceptLoadedReports": true}')) + "}"
+    assert len(body.encode()) == MAX_BYTES
+    _write(path, body)
+    assert RuntimeSettings(path, flag=False, clock=Clock()).accept_loaded_reports() is True
+
+
+def test_a_file_one_byte_over_the_largest_size_closes_the_reports(tmp_path: Path) -> None:
+    path = tmp_path / "s.json"
+    _write(path, '{"acceptLoadedReports": true' + " " * (MAX_BYTES - len('{"acceptLoadedReports": true}') + 1) + "}")
+    settings = RuntimeSettings(path, flag=True, clock=Clock())
+    assert settings.accept_loaded_reports() is False
+    assert "4096" in settings.reason
+
+
+def test_a_file_that_is_not_utf8_closes_the_reports(tmp_path: Path) -> None:
+    path = tmp_path / "s.json"
+    path.write_bytes(b'{"acceptLoadedReports": true, "x": "\xff\xfe"}')
+    settings = RuntimeSettings(path, flag=True, clock=Clock())
+    assert settings.accept_loaded_reports() is False
+    assert settings.reason
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_a_file_with_a_json_constant_that_is_not_standard_closes_the_reports(tmp_path: Path, constant: str) -> None:
+    path = tmp_path / "s.json"
+    _write(path, '{"acceptLoadedReports": true, "n": %s}' % constant)
+    assert RuntimeSettings(path, flag=True, clock=Clock()).accept_loaded_reports() is False
+
+
+def test_the_file_removed_while_running_gives_the_decision_back_to_the_flag(tmp_path: Path) -> None:
+    path = tmp_path / "s.json"
+    clock = Clock()
+    _write(path, {"acceptLoadedReports": True})
+    settings = RuntimeSettings(path, flag=False, clock=clock)
+    assert settings.accept_loaded_reports() is True
+    path.unlink()
+    clock.tick()
+    assert settings.accept_loaded_reports() is False
+    assert settings.reason == ""
+    settings.flag = True
+    clock.tick()
+    assert settings.accept_loaded_reports() is True
+
+
+def test_a_file_that_says_false_wins_over_a_flag_that_says_true(tmp_path: Path) -> None:
+    path = tmp_path / "s.json"
+    _write(path, {"acceptLoadedReports": False})
+    assert RuntimeSettings(path, flag=True, clock=Clock()).accept_loaded_reports() is False
+
+
+def test_a_broken_file_that_does_not_change_stays_closed_on_every_read(tmp_path: Path) -> None:
+    path = tmp_path / "s.json"
+    clock = Clock()
+    _write(path, "{")
+    settings = RuntimeSettings(path, flag=True, clock=clock)
+    for _ in range(5):
+        assert settings.accept_loaded_reports() is False
+        clock.tick()
+
+
+def test_a_broken_file_that_is_fixed_opens_again_only_with_a_true_boolean(tmp_path: Path) -> None:
+    path = tmp_path / "s.json"
+    clock = Clock()
+    _write(path, "{")
+    settings = RuntimeSettings(path, flag=False, clock=clock)
+    assert settings.accept_loaded_reports() is False
+    for content in ('{"acceptLoadedReports": "true"}', '{"acceptLoadedReports": 1}', '{"acceptLoadedReports": null}', '[true]'):
+        _write(path, content)
+        clock.tick()
+        assert settings.accept_loaded_reports() is False, content
+    _write(path, '{"acceptLoadedReports": true, "padding": "0000"}')
+    clock.tick()
+    assert settings.accept_loaded_reports() is True
+
+
+def test_seeded_fuzz_of_the_contents_never_raises_and_only_a_true_boolean_opens(tmp_path: Path) -> None:
+    import random
+
+    rng = random.Random(20240607)
+    path = tmp_path / "s.json"
+    pieces = ['{', '}', '"acceptLoadedReports"', ':', 'true', 'false', 'null', '1', '"true"', ',', '[', ']', ' ', '\n', '"x"', 'NaN', '\u0000']
+    clock = Clock()
+    stamp = 1_700_000_000_000_000_000
+    settings = RuntimeSettings(path, flag=False, clock=clock)
+    for _ in range(300):
+        text = "".join(rng.choice(pieces) for _ in range(rng.randint(0, 14)))
+        path.write_bytes(text.encode("utf-8"))
+        stamp += 1_000_000_000
+        os.utime(path, ns=(stamp, stamp))  # a coarse file clock must not hide a change from the stamp
+        clock.tick()
+        opened = settings.accept_loaded_reports()
+        try:
+            data = json.loads(text, parse_constant=lambda name: (_ for _ in ()).throw(ValueError(name)))
+            expected = isinstance(data, dict) and data.get("acceptLoadedReports") is True
+        except ValueError:
+            expected = False
+        assert opened is expected, text
+
+
+def test_the_path_of_the_argument_wins_over_the_environment_and_blanks_mean_none() -> None:
+    assert settings_path_from("a.json", {"HYDRA_UMC_DETECTION_HEF_SETTINGS_FILE": "b.json"}) == Path("a.json")
+    assert settings_path_from("  ", {"HYDRA_UMC_DETECTION_HEF_SETTINGS_FILE": "  "}) is None
+    assert settings_path_from(None, {}) is None
