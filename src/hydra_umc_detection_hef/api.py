@@ -234,6 +234,9 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 class RegistryServer(ThreadingHTTPServer):
     health_open: bool = False  # GET /health answers only when the operator opens it (health_route.py)
     identity_key: bytes | None = None  # the signing key of HYDRA-UMC-SERVER, when the operator turned its identity on (server_identity.py)
+    loaded: LoadedModels | None
+    token: str
+    _reports_lock: threading.Lock
     settings: RuntimeSettings | None = None  # the settings file that switches the reports while the service runs (settings_file.py)
 
     def reports(self) -> LoadedModels | None:
