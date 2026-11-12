@@ -73,6 +73,8 @@ C'est l'un des 4 enfants de **[HYDRA-UMC-VISION-NODE](https://github.com/JuanenR
 
 **HYDRA-UMC-DETECTION-HEF** est l'étagère où les modèles compilés du nœud de vision sont rangés : chaque modèle a un nom, une version, une tâche, une forme d'entrée, ses classes et une somme de contrôle, et rien ne peut être chargé s'il ne correspond pas. Aucun modèle n'a encore été compilé ni exécuté sur une puce Hailo.
 
+> **Plateforme :** là où ce README dit CM5, il s'agit du banc pilote qui fonctionne aujourd'hui ; la plateforme visée par HYDRA-UMC est un NVIDIA Jetson Orin NX 16 Go, une conception ni construite ni testée.
+
 ## 🏛️ Architecture
 
 Le diagramme ci-dessous est la chaîne d'outils de *compilation* cible vers laquelle ce projet est construit - toujours non implémentée, car chaque étape nécessite du vrai matériel Hailo. Le *registre* de modèles (versionnement + vérification d'intégrité des `.hef` que ce pipeline produira un jour) est réel aujourd'hui ; voir « Points Clés » ci-dessus et les décisions de conception ci-dessous.

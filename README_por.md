@@ -71,6 +71,8 @@ O **HYDRA-UMC-DETECTION-HEF** destina-se a ser uma biblioteca e cadeia de ferram
 
 O **HYDRA-UMC-DETECTION-HEF** é a prateleira onde os modelos compilados do nó de visão se guardam por ordem: cada modelo tem nome, versão, tarefa, forma de entrada, as suas classes e uma soma de verificação, e nada pode ser carregado se não corresponder. Ainda não foi compilado nem executado nenhum modelo num chip Hailo.
 
+> **Plataforma:** onde este README diz CM5, refere-se ao banco piloto que funciona hoje; a plataforma objetivo do HYDRA-UMC é uma NVIDIA Jetson Orin NX de 16 GB, um desenho que não foi construído nem testado.
+
 ## 🏛️ Arquitetura
 
 O diagrama abaixo é a cadeia de ferramentas de *compilação* de destino para que este projeto está a ser construído - ainda não implementada, já que cada passo precisa de hardware Hailo real. O *registo* de modelos (versionamento + verificação de integridade de quaisquer ficheiros `.hef` que este pipeline venha a produzir) é real hoje; veja "Pontos principais" acima e as decisões de desenho abaixo.
