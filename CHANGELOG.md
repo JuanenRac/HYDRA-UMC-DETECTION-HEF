@@ -4,6 +4,9 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A simulation bench for the detection service:** `tests/test_simulation_bench.py` runs the real decoder, the real mAP measure, the real registry, the reports of loaded models and the signed update over the air against a simulated accelerator (a seeded tensor in the `hailo_nms_by_class` format with chosen jitter, misses, invented objects and garbage rows, in five frame sizes, both resize modes and every box order and unit) and a simulated fleet (old, tampered and unknown models, a flood of nodes, bundles cut short anywhere, older bundles and a rollback). The workflow "Simulation bench" runs it on every change and `docs/SIMULATION.md` describes it. The manifest now declares the evidence level `simulator`.
+- **The coverage of the tests is measured on every change:** the workflow "Coverage floor" runs the whole suite under line and branch coverage and fails when it falls under 92 %.
+
 - **README: the platform statement:** a note says that where the README speaks of the CM5 it means the pilot bench that runs today, and that the target platform of HYDRA-UMC, an NVIDIA Jetson Orin NX 16 GB, is a design that has not been built or tested.
 - **22 more tests for the refusals of the HTTP API:** `tests/test_api_error_paths.py` runs a real server and checks a query parameter given twice, a missing parameter, a model that does not exist, a name that is two models (409), a server started without a folder of models (503), a registry that cannot be read or is not a list of entries (502 on every route that reads it), an entry that points outside the folder of models, the routes that do not exist and a post to a route that takes none. Line coverage of `api.py` goes from 85 % to 93 % and of the whole package from 93 % to 94 %.
 
