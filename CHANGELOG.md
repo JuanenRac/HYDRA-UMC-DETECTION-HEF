@@ -4,6 +4,9 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+
+## [0.2.1]
+
 - **Comments describe what the code does, not what it used to do:** the notes in the source and the tests say the present behaviour and the reason for it. Comments only: no behaviour changes.
 - **The SDK pin and the shared tools are up to date:** the SDK dependency names the newest release tag, and the shared tools are the canonical copies again.
 - **A simulation bench for the detection service:** `tests/test_simulation_bench.py` runs the real decoder, the real mAP measure, the real registry, the reports of loaded models and the signed update over the air against a simulated accelerator (a seeded tensor in the `hailo_nms_by_class` format with chosen jitter, misses, invented objects and garbage rows, in five frame sizes, both resize modes and every box order and unit) and a simulated fleet (old, tampered and unknown models, a flood of nodes, bundles cut short anywhere, older bundles and a rollback). The workflow "Simulation bench" runs it on every change and `docs/SIMULATION.md` describes it. The manifest now declares the evidence level `simulator`.
@@ -15,6 +18,8 @@ All notable changes to this project are documented here.
 - **120 more tests for the identity of the server, the bearer token and the metrics:** `tests/test_server_identity_edges.py` (60) covers every reason a token of the SERVER is refused, the key files, the choice of key by flag or environment, the decision of `accepts` for a handler without a network, and the probe and its command line against a real local service; `tests/test_access_and_metrics_edges.py` (60) covers what counts as loopback, where the token comes from and how short it may be, what a request must present, the 401 that is given, the labels that can never carry free text (with a seeded walk of names), the counters by class of status and the answer of `GET /metrics`. Line coverage of `server_identity.py` goes from 74 % to 98 %, `access.py` from 81 % to 100 %, `service_metrics.py` from 84 % to 99 % and the whole package from 90 % to 93 %.
 
 - **The loaded-model reports can be switched while the service runs (`serve --settings-file FILE`, or `HYDRA_UMC_DETECTION_HEF_SETTINGS_FILE`, off by default):** the server writes a small JSON file `{"acceptLoadedReports": true}` and the service looks at it again when it changes, so turning `POST` and `GET /models/loaded` on or off no longer needs a restart. A missing file leaves `--accept-loaded-reports` in force; a file that cannot be trusted (not a regular file, over 4096 bytes, not JSON, not an object, a value that is not a true boolean) turns the reports off, and a `true` away from loopback is refused without a token or the identity of the server. Turning the reports off forgets what was reported.
+
+- Build version synchronized with `hydra-umc.project.json` and the repository-native version source.
 
 ## [0.2.0] - The build test of the repository compiles only on CI or when allowed: for the stacks that compile (rust, go, android, flutter, firmware-c), tools/buildtest.py prints BUILDTEST=SKIPPED with exit status 2 on a plain PC, never a... (and 2 more changes)
 
