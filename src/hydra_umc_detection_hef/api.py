@@ -175,10 +175,10 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
         # verify_checksum (reached through safe_load) raises
         # RegistryError when a registry entry's own hef_path resolves
         # outside models_dir - a real, deliberate defense against a
-        # corrupt/tampered registry, not a client input error. Uncaught
-        # here, it used to propagate straight out of this handler as an
+        # corrupt/tampered registry, not a client input error. Left
+        # uncaught, it would propagate straight out of this handler as an
         # unhandled exception instead of the same controlled error every
-        # other registry-integrity failure in this file already gets
+        # other registry-integrity failure in this file gets
         # (_load_registry()'s own 502, right above).
         try:
             result = safe_load(entry, self.server.models_dir, params["target_arch"],
