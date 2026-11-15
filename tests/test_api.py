@@ -135,9 +135,9 @@ def test_registry_load_translates_a_path_escaping_hef_path_into_a_controlled_err
     # outside models_dir - a real defense against a corrupt/tampered
     # registry (_parse_entry only rejects an ABSOLUTE hef_path; a
     # relative one can still climb out with enough ../ segments).
-    # Uncaught here, this used to propagate straight out of the handler
+    # Left uncaught, this would propagate straight out of the handler
     # instead of the same controlled 502 every other registry-integrity
-    # failure in this file already gets.
+    # failure in this file gets.
     reg_path = tmp_path / "registry.json"
     entry = _entry()
     entry["hef_path"] = "../escaped.hef"
