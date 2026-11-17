@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **An update that stops half way leaves the node as it was, and the way back puts the replaced model files back:** `apply_bundle` keeps a copy (`.prev`) of every `.hef` it is going to replace and writes a journal (`<registry>.apply.journal`) before it replaces the first one; if it stops before the registry is in place (a full disk, a signal) the replaced files come back and the added ones are removed, and `rollback_registry` restores the replaced files besides the registry and its signature. A new update forgets the copies of the one before. Tests cut the update at the first file, at the last file and at the registry.
 - **The service can remember the hash of a model file that did not change (`serve --checksum-cache`, off):** `GET /registry/load` then checks a large `.hef` once and not on every call, as long as the file keeps its path, size and modification time to the nanosecond; at most 64 files are remembered and the cache forgets an older state of a file when it sees a new one. It is off by default, and the load that returns the bytes (`keep_bytes`) always hashes the bytes it hands over. Tests cover the hit, the change of size and of time, the limit and the switch.
 
 ## [0.2.1]

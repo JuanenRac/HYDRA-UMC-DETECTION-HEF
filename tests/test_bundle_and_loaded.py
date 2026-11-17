@@ -369,3 +369,72 @@ def test_the_load_route_carries_the_identity_and_applies_the_gates(tmp_path: Pat
     finally:
         plain.shutdown()
         plain.server_close()
+
+
+def _rebuilt_publisher(tmp_path: Path, registry: Path, models: Path, private: Path) -> None:
+    """The owner rebuilds model 0.1.0 (new bytes, same file name) and adds 0.3.0."""
+    rebuilt, added = b"model 0.1.0 rebuilt", b"model 0.3.0"
+    (models / "pcb-0.1.0.hef").write_bytes(rebuilt)
+    (models / "pcb-0.3.0.hef").write_bytes(added)
+    registry.write_text(json.dumps([_entry("0.1.0", rebuilt), _entry("0.2.0", b"model 0.2.0"), _entry("0.3.0", added)]), encoding="utf-8")
+    sign_registry(registry, private)
+
+
+def _node_state(node_registry: Path, node_models: Path) -> dict[str, bytes]:
+    files = {path.name: path.read_bytes() for path in sorted(node_models.glob("*.hef"))}
+    files["registry"] = node_registry.read_bytes()
+    files["signature"] = node_registry.with_name("registry.json.sig").read_bytes()
+    return files
+
+
+def test_the_way_back_puts_the_replaced_model_files_back(tmp_path: Path) -> None:
+    registry, models, private, public = _publisher(tmp_path, ("0.1.0", "0.2.0"))
+    node_registry, node_models = _node(tmp_path)
+    apply_bundle(_bundle(tmp_path, registry, models), node_registry, node_models, public, enabled=True)
+    before = _node_state(node_registry, node_models)
+    _rebuilt_publisher(tmp_path, registry, models, private)
+    apply_bundle(_bundle(tmp_path, registry, models, out="two.zip"), node_registry, node_models, public, enabled=True)
+    assert (node_models / "pcb-0.1.0.hef").read_bytes() == b"model 0.1.0 rebuilt" and (node_models / "pcb-0.3.0.hef").is_file()
+    assert rollback_registry(node_registry) == ["registry.json", "registry.json.sig"]
+    assert (node_models / "pcb-0.1.0.hef").read_bytes() == b"model 0.1.0"
+    assert (node_models / "pcb-0.3.0.hef").is_file()                      # what an update added stays where it is
+    assert {k: v for k, v in _node_state(node_registry, node_models).items() if k != "pcb-0.3.0.hef"} == before
+    assert not node_registry.with_name("registry.json.apply.journal").exists()
+
+
+@pytest.mark.parametrize("cut", [1, 2, 3, 4, 5, 6])
+def test_an_update_cut_at_any_point_leaves_the_node_as_it_was(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cut: int) -> None:
+    import os
+
+    registry, models, private, public = _publisher(tmp_path, ("0.1.0", "0.2.0"))
+    node_registry, node_models = _node(tmp_path)
+    apply_bundle(_bundle(tmp_path, registry, models), node_registry, node_models, public, enabled=True)
+    before = _node_state(node_registry, node_models)
+    _rebuilt_publisher(tmp_path, registry, models, private)
+    bundle = _bundle(tmp_path, registry, models, out="two.zip")
+    real, calls = os.replace, []
+
+    def replace(source, destination):
+        calls.append(destination)
+        if len(calls) == cut:                  # the journal, the three model files, the registry, its signature: the call number `cut` fails
+            raise OSError("disk full")
+        return real(source, destination)
+
+    monkeypatch.setattr("hydra_umc_detection_hef.bundle.os.replace", replace)
+    with pytest.raises(OSError, match="disk full"):
+        apply_bundle(bundle, node_registry, node_models, public, enabled=True)
+    monkeypatch.undo()
+    assert _node_state(node_registry, node_models) == before              # the replaced files are back, the added one is gone, the registry is the old one
+    assert not node_registry.with_name("registry.json.apply.journal").exists()
+    assert not list(node_models.glob("*.prev"))
+
+
+def test_a_new_update_forgets_the_copies_of_the_one_before(tmp_path: Path) -> None:
+    registry, models, private, public = _publisher(tmp_path, ("0.1.0", "0.2.0"))
+    node_registry, node_models = _node(tmp_path)
+    apply_bundle(_bundle(tmp_path, registry, models), node_registry, node_models, public, enabled=True)
+    _rebuilt_publisher(tmp_path, registry, models, private)
+    apply_bundle(_bundle(tmp_path, registry, models, out="two.zip"), node_registry, node_models, public, enabled=True)
+    assert (node_models / "pcb-0.1.0.hef.prev").read_bytes() == b"model 0.1.0"
+    apply_bundle(_bundle(tmp_path, registry, models, out="three.zip"), node_registry, node_models, public, enabled=True)
+    assert (node_models / "pcb-0.1.0.hef.prev").read_bytes() == b"model 0.1.0 rebuilt"   # the copy now is the file of the update before

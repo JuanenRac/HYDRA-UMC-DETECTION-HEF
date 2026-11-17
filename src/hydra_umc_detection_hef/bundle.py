@@ -42,6 +42,7 @@ REGISTRY = "registry.json"
 MAX_MEMBERS = 1000
 DEFAULT_MAX_TOTAL_BYTES = 512 * 1024 * 1024
 PREVIOUS_SUFFIX = ".prev"
+JOURNAL_SUFFIX = ".apply.journal"
 
 
 class BundleError(RegistryError):
@@ -157,6 +158,46 @@ def _newest(entries: list[ModelEntry]) -> dict[tuple[str, str], tuple[int, int, 
     return best
 
 
+def _journal_path(registry_path: Path) -> Path:
+    return registry_path.with_name(registry_path.name + JOURNAL_SUFFIX)
+
+
+def _write_atomically(destination: Path, data: bytes) -> None:
+    part = destination.with_name(destination.name + ".part")
+    part.write_bytes(data)
+    os.replace(part, destination)
+
+
+def _restore_models(models_dir: Path, overwritten: list[str]) -> list[str]:
+    """Put back the `.hef` files that an update replaced, from the copies it kept next to them."""
+    restored = []
+    for rel in overwritten:
+        target = models_dir / rel
+        previous = target.with_name(target.name + PREVIOUS_SUFFIX)
+        if previous.is_file():
+            shutil.copy2(previous, target.with_name(target.name + ".part"))
+            os.replace(target.with_name(target.name + ".part"), target)
+            previous.unlink()
+            restored.append(rel)
+    return restored
+
+
+def _forget_kept_models(registry_path: Path) -> None:
+    """A new update replaces what the one before it kept for the way back: the copies of the files it had replaced are removed."""
+    journal = _journal_path(registry_path)
+    if not journal.is_file():
+        return
+    try:
+        recorded = json.loads(journal.read_text(encoding="utf-8"))
+        root = Path(recorded["models_dir"])
+        for rel in recorded["overwritten"]:
+            target = root / rel
+            target.with_name(target.name + PREVIOUS_SUFFIX).unlink(missing_ok=True)
+    except (OSError, ValueError, KeyError, TypeError):
+        pass    # a journal that cannot be read is not a reason to stop the update; the copies stay where they are
+    journal.unlink(missing_ok=True)
+
+
 def apply_bundle(bundle_path: Path, registry_path: Path, models_dir: Path, public_key_file: Path | None, *, enabled: bool,
                  allow_downgrade: bool = False, max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES) -> dict[str, Any]:
     """Check the bundle and put it in place. Raises BundleError before touching anything when a check fails."""
@@ -199,30 +240,57 @@ def apply_bundle(bundle_path: Path, registry_path: Path, models_dir: Path, publi
             lost = sorted(k for k in old if k not in _newest(entries))
             if lost:
                 raise BundleError(f"the new registry no longer lists {lost[0][0]} ({lost[0][1]}): refused without --allow-downgrade")
-        installed = []
+        installed: list[str] = []
+        replaced: list[Path] = []
+        had_before: dict[Path, bool] = {}
+        overwritten: list[str] = []
+        _forget_kept_models(registry_path)
         for rel, target in targets.items():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            part = target.with_name(target.name + ".part")
-            part.write_bytes(packed[rel])
-            os.replace(part, target)
-            installed.append(rel)
+            if target.is_file():
+                shutil.copy2(target, target.with_name(target.name + PREVIOUS_SUFFIX))   # the file that is about to be replaced is kept
+                overwritten.append(rel)
         sig = signature_path(registry_path)
-        if registry_path.is_file():
-            shutil.copy2(registry_path, registry_path.with_name(registry_path.name + PREVIOUS_SUFFIX))
-        if sig.is_file():
-            shutil.copy2(sig, sig.with_name(sig.name + PREVIOUS_SUFFIX))
-        for source, destination in ((REGISTRY, registry_path), (REGISTRY + SIGNATURE_SUFFIX, sig)):
-            part = destination.with_name(destination.name + ".part")
-            part.write_bytes(members[source])
-            os.replace(part, destination)
+        try:
+            # the journal is written before the first file is replaced: it says which files were replaced (and kept) and which were added
+            registry_path.parent.mkdir(parents=True, exist_ok=True)
+            _write_atomically(_journal_path(registry_path), json.dumps({"models_dir": str(models_dir), "overwritten": overwritten,
+                                                                          "added": [r for r in targets if r not in overwritten]}).encode("utf-8"))
+            for rel, target in targets.items():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                _write_atomically(target, packed[rel])
+                installed.append(rel)
+            had_before = {destination: destination.is_file() for destination in (registry_path, sig)}
+            if registry_path.is_file():
+                shutil.copy2(registry_path, registry_path.with_name(registry_path.name + PREVIOUS_SUFFIX))
+            if sig.is_file():
+                shutil.copy2(sig, sig.with_name(sig.name + PREVIOUS_SUFFIX))
+            for source, destination in ((REGISTRY, registry_path), (REGISTRY + SIGNATURE_SUFFIX, sig)):
+                _write_atomically(destination, members[source])
+                replaced.append(destination)
+        except BaseException:
+            # the update stopped half way (a full disk, a signal): the files it had replaced come back and the ones it had added go, so the node is as it was
+            for destination in replaced:
+                previous = destination.with_name(destination.name + PREVIOUS_SUFFIX)
+                if had_before[destination] and previous.is_file():
+                    shutil.copy2(previous, destination.with_name(destination.name + ".part"))
+                    os.replace(destination.with_name(destination.name + ".part"), destination)
+                elif not had_before[destination]:
+                    destination.unlink(missing_ok=True)
+            _restore_models(models_dir, overwritten)
+            for rel in installed:
+                if rel not in overwritten:
+                    targets[rel].unlink(missing_ok=True)
+            _journal_path(registry_path).unlink(missing_ok=True)
+            raise
     return {"models": sorted(f"{e.name} {e.version}" for e in entries), "files": sorted(installed), "entries": len(entries)}
 
 
 def rollback_registry(registry_path: Path) -> list[str]:
-    """Put the registry and signature that `apply_bundle` kept (`.prev`) back. The `.hef` files that were added stay where they are."""
+    """Put the registry and signature that `apply_bundle` kept (`.prev`) back, and the `.hef` files that the update replaced (from the copies it kept).
+    The `.hef` files that were added stay where they are."""
     registry_path = Path(registry_path)
     sig = signature_path(registry_path)
-    restored = []
+    restored: list[str] = []
     with registry_lock(registry_path):
         for destination in (registry_path, sig):
             previous = destination.with_name(destination.name + PREVIOUS_SUFFIX)
@@ -234,6 +302,14 @@ def rollback_registry(registry_path: Path) -> list[str]:
             shutil.copy2(previous, part)
             os.replace(part, destination)
             restored.append(destination.name)
+        journal = _journal_path(registry_path)
+        if journal.is_file():
+            try:
+                recorded = json.loads(journal.read_text(encoding="utf-8"))
+                _restore_models(Path(recorded["models_dir"]), [str(rel) for rel in recorded["overwritten"]])   # the answer names the registry files, as before
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                raise BundleError(f"the registry was put back, but the journal of the update cannot be read, so its .hef files were not: {exc}") from exc
+            journal.unlink(missing_ok=True)
     return restored
 
 
