@@ -338,7 +338,9 @@ def _cmd_registry_record_accuracy(args: argparse.Namespace) -> int:
 
 def _cmd_registry_make_bundle(args: argparse.Namespace) -> int:
     try:
-        summary = make_bundle(Path(args.registry), Path(args.models_dir), Path(args.out), list(args.name))
+        key = getattr(args, "sign_with", None) or os.environ.get(SIGNING_KEY_ENV) or None
+        summary = make_bundle(Path(args.registry), Path(args.models_dir), Path(args.out), list(args.name),
+                              serial=getattr(args, "serial", None), signing_key=Path(key) if key and getattr(args, "serial", None) is not None else None)
     except RegistryError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -350,7 +352,7 @@ def _cmd_registry_apply_bundle(args: argparse.Namespace) -> int:
     try:
         summary = apply_bundle(
             Path(args.bundle), Path(args.registry), Path(args.models_dir), resolve_public_key(args.public_key),
-            enabled=ota_enabled(args.enable_ota), allow_downgrade=args.allow_downgrade,
+            enabled=ota_enabled(args.enable_ota), allow_downgrade=args.allow_downgrade, require_serial=bool(getattr(args, "require_bundle_serial", False)),
         )
     except RegistryError as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -495,6 +497,8 @@ def _build_parser() -> argparse.ArgumentParser:
     pack.add_argument("--models-dir", required=True, help="Directory containing the .hef files")
     pack.add_argument("--out", required=True, help="Bundle file to write")
     pack.add_argument("--name", action="append", default=[], help="Pack only the files of this model (repeat for several); default: all")
+    pack.add_argument("--serial", type=int, default=None, help="Number above 0 that grows with every bundle you make: it goes into the signed bundle.json so that a node can refuse an older bundle (needs --sign-with)")
+    pack.add_argument("--sign-with", default=None, metavar="PRIVATE_KEY", dest="sign_with", help="Ed25519 private key file that signs bundle.json when --serial is given (or HYDRA_UMC_DETECTION_HEF_SIGNING_KEY_FILE)")
     pack.set_defaults(func=_cmd_registry_make_bundle)
 
     apply = registry_sub.add_parser("apply-bundle", help="Check a signed bundle and put it in place (off unless --enable-ota or HYDRA_UMC_DETECTION_HEF_OTA=1).")
@@ -504,6 +508,7 @@ def _build_parser() -> argparse.ArgumentParser:
     apply.add_argument("--public-key", default=None, help="Ed25519 public key file of the owner of the registry (required)")
     apply.add_argument("--enable-ota", action="store_true", dest="enable_ota", help="Turn the update on for this command")
     apply.add_argument("--allow-downgrade", action="store_true", dest="allow_downgrade", help="Accept a bundle that goes to older versions or drops a model")
+    apply.add_argument("--require-bundle-serial", action="store_true", dest="require_bundle_serial", help="Refuse a bundle without a signed serial, or whose serial is not higher than the last one applied here (off by default; --allow-downgrade lets an older one through)")
     apply.set_defaults(func=_cmd_registry_apply_bundle)
 
     rollback = registry_sub.add_parser("rollback", help="Put the registry and signature that apply-bundle kept back.")

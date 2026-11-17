@@ -438,3 +438,83 @@ def test_a_new_update_forgets_the_copies_of_the_one_before(tmp_path: Path) -> No
     assert (node_models / "pcb-0.1.0.hef.prev").read_bytes() == b"model 0.1.0"
     apply_bundle(_bundle(tmp_path, registry, models, out="three.zip"), node_registry, node_models, public, enabled=True)
     assert (node_models / "pcb-0.1.0.hef.prev").read_bytes() == b"model 0.1.0 rebuilt"   # the copy now is the file of the update before
+
+
+def _serial_bundle(tmp_path: Path, registry: Path, models: Path, private: Path, serial: int, out: str) -> Path:
+    path = tmp_path / out
+    make_bundle(registry, models, path, serial=serial, signing_key=private)
+    return path
+
+
+def test_a_bundle_with_a_signed_serial_is_not_applied_again_when_the_node_asks_for_it(tmp_path: Path) -> None:
+    registry, models, private, public = _publisher(tmp_path)
+    node_registry, node_models = _node(tmp_path)
+    first = _serial_bundle(tmp_path, registry, models, private, 5, "five.zip")
+    assert apply_bundle(first, node_registry, node_models, public, enabled=True, require_serial=True)["serial"] == 5
+    assert node_registry.with_name("registry.json.serial").read_text(encoding="ascii").strip() == "5"
+    with pytest.raises(BundleError, match="not higher than 5"):
+        apply_bundle(first, node_registry, node_models, public, enabled=True, require_serial=True)       # the same bundle again
+    with pytest.raises(BundleError, match="not higher than 5"):
+        apply_bundle(_serial_bundle(tmp_path, registry, models, private, 4, "four.zip"), node_registry, node_models, public, enabled=True, require_serial=True)
+    apply_bundle(_serial_bundle(tmp_path, registry, models, private, 4, "four2.zip"), node_registry, node_models, public, enabled=True, require_serial=True, allow_downgrade=True)
+    assert apply_bundle(_serial_bundle(tmp_path, registry, models, private, 6, "six.zip"), node_registry, node_models, public, enabled=True, require_serial=True)["serial"] == 6
+
+
+def test_without_the_option_old_bundles_and_bundles_without_a_serial_keep_working(tmp_path: Path) -> None:
+    registry, models, private, public = _publisher(tmp_path)
+    node_registry, node_models = _node(tmp_path)
+    apply_bundle(_bundle(tmp_path, registry, models), node_registry, node_models, public, enabled=True)
+    assert not node_registry.with_name("registry.json.serial").exists()
+    bundle = _serial_bundle(tmp_path, registry, models, private, 3, "three.zip")
+    apply_bundle(bundle, node_registry, node_models, public, enabled=True)
+    apply_bundle(bundle, node_registry, node_models, public, enabled=True)                                # not required: the repeat is let through
+    with pytest.raises(BundleError, match="requires a bundle with a serial"):
+        apply_bundle(_bundle(tmp_path, registry, models, out="plain.zip"), node_registry, node_models, public, enabled=True, require_serial=True)
+
+
+def test_a_serial_that_the_signature_does_not_cover_is_refused(tmp_path: Path) -> None:
+    registry, models, private, public = _publisher(tmp_path)
+    node_registry, node_models = _node(tmp_path)
+    bundle = _serial_bundle(tmp_path, registry, models, private, 2, "two.zip")
+    with zipfile.ZipFile(bundle) as source:
+        members = {name: source.read(name) for name in source.namelist()}
+    forged = json.loads(members["bundle.json"])
+    forged["serial"] = 99
+    tampered = dict(members, **{"bundle.json": json.dumps(forged, indent=2, sort_keys=True).encode()})
+    with zipfile.ZipFile(tmp_path / "forged.zip", "w") as out:
+        for name, data in tampered.items():
+            out.writestr(name, data)
+    with pytest.raises(BundleError, match="signature of bundle.json does not match"):
+        apply_bundle(tmp_path / "forged.zip", node_registry, node_models, public, enabled=True)
+    without = {name: data for name, data in members.items() if name != "bundle.json.sig"}
+    with zipfile.ZipFile(tmp_path / "unsigned.zip", "w") as out:
+        for name, data in without.items():
+            out.writestr(name, data)
+    with pytest.raises(BundleError, match="bundle.json.sig is missing"):
+        apply_bundle(tmp_path / "unsigned.zip", node_registry, node_models, public, enabled=True)
+    assert not node_registry.exists()                                                                   # nothing was touched
+
+
+def test_a_serial_needs_a_whole_number_and_a_key(tmp_path: Path) -> None:
+    registry, models, private, _public = _publisher(tmp_path)
+    for bad in (0, -1, True):
+        with pytest.raises(BundleError, match="whole number above 0"):
+            make_bundle(registry, models, tmp_path / "x.zip", serial=bad, signing_key=private)    # type: ignore[arg-type]
+    with pytest.raises(BundleError, match="private key"):
+        make_bundle(registry, models, tmp_path / "x.zip", serial=1)
+
+
+def test_the_command_line_makes_and_applies_a_bundle_with_a_serial(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    registry, models, private, public = _publisher(tmp_path)
+    node_registry, node_models = _node(tmp_path)
+    out = tmp_path / "cli.zip"
+
+    def run(*argv: str) -> int:
+        monkeypatch.setattr("sys.argv", ["prog", *argv])
+        return main()
+
+    assert run("registry", "make-bundle", "--registry", str(registry), "--models-dir", str(models), "--out", str(out), "--serial", "7", "--sign-with", str(private)) == 0
+    args = ("registry", "apply-bundle", "--bundle", str(out), "--registry", str(node_registry), "--models-dir", str(node_models), "--public-key", str(public), "--enable-ota", "--require-bundle-serial")
+    assert run(*args) == 0
+    capsys.readouterr()
+    assert run(*args) == 1 and "not higher than 7" in capsys.readouterr().err
