@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any
 
 from .registry import ModelEntry, RegistryError, compute_sha256, load_registry, registry_lock
-from .signing import SIGNATURE_SUFFIX, signature_path, verify_registry_bytes
+from .signing import SIGNATURE_SUFFIX, sign_bytes, signature_path, verify_bytes, verify_registry_bytes
 
 OTA_ENV = "HYDRA_UMC_DETECTION_HEF_OTA"
 BUNDLE_FORMAT = 1
@@ -42,6 +42,9 @@ REGISTRY = "registry.json"
 MAX_MEMBERS = 1000
 DEFAULT_MAX_TOTAL_BYTES = 512 * 1024 * 1024
 PREVIOUS_SUFFIX = ".prev"
+JOURNAL_SUFFIX = ".apply.journal"
+SERIAL_SUFFIX = ".serial"
+MANIFEST_SIGNATURE = MANIFEST + SIGNATURE_SUFFIX
 
 
 class BundleError(RegistryError):
@@ -64,14 +67,23 @@ def _member_ok(name: str) -> bool:
     parts = name.split("/")
     if any(part in ("", ".", "..") for part in parts):
         return False
-    if name in (MANIFEST, REGISTRY, REGISTRY + SIGNATURE_SUFFIX):
+    if name in (MANIFEST, MANIFEST_SIGNATURE, REGISTRY, REGISTRY + SIGNATURE_SUFFIX):
         return True
     return parts[0] == "models" and len(parts) >= 2
 
 
-def make_bundle(registry_path: Path, models_dir: Path, out_path: Path, names: list[str] | None = None) -> dict[str, Any]:
-    """Pack the signed registry and the `.hef` files of the selected models (all of them when `names` is empty). Refuses a file that does not match its entry."""
+def make_bundle(registry_path: Path, models_dir: Path, out_path: Path, names: list[str] | None = None, *,
+                serial: int | None = None, signing_key: Path | None = None) -> dict[str, Any]:
+    """Pack the signed registry and the `.hef` files of the selected models (all of them when `names` is empty). Refuses a file that does not match its entry.
+
+    With `serial` (a whole number above 0 that the owner raises with every bundle) and the private key, `bundle.json` also carries the serial and `bundle.json.sig`
+    signs it, so a node can refuse a bundle that is not newer than the last one it applied."""
     registry_path, models_dir, out_path = Path(registry_path), Path(models_dir), Path(out_path)
+    if serial is not None:
+        if isinstance(serial, bool) or not isinstance(serial, int) or serial < 1:
+            raise BundleError("the serial of a bundle is a whole number above 0")
+        if signing_key is None:
+            raise BundleError("a bundle with a serial is signed: give the private key (--sign-with)")
     sig = signature_path(registry_path)
     if not sig.is_file():
         raise BundleError(f"{sig.name} does not exist: sign the registry first (registry sign)")
@@ -87,13 +99,18 @@ def make_bundle(registry_path: Path, models_dir: Path, out_path: Path, names: li
         if compute_sha256(file) != entry.sha256:
             raise BundleError(f"{entry.hef_path} does not match the checksum of {entry.name} {entry.version}")
         members["models/" + entry.hef_path.replace("\\", "/")] = file.read_bytes()
-    manifest = {"format": BUNDLE_FORMAT, "files": {name: _sha256(data) for name, data in sorted(members.items())}}
+    manifest: dict[str, Any] = {"format": BUNDLE_FORMAT, "files": {name: _sha256(data) for name, data in sorted(members.items())}}
+    if serial is not None:
+        manifest["serial"] = serial
+    manifest_bytes = json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     handle, temporary = tempfile.mkstemp(dir=out_path.parent, prefix=out_path.name + ".", suffix=".tmp")
     os.close(handle)
     try:
         with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as archive:
-            archive.writestr(MANIFEST, json.dumps(manifest, indent=2, sort_keys=True))
+            archive.writestr(MANIFEST, manifest_bytes)
+            if serial is not None and signing_key is not None:
+                archive.writestr(MANIFEST_SIGNATURE, sign_bytes(manifest_bytes, signing_key) + "\n")
             for name, data in sorted(members.items()):
                 archive.writestr(name, data)
         os.replace(temporary, out_path)
@@ -103,7 +120,8 @@ def make_bundle(registry_path: Path, models_dir: Path, out_path: Path, names: li
     return {"bundle": str(out_path), "models": [f"{e.name} {e.version}" for e in chosen], "files": len(members)}
 
 
-def _read_bundle(path: Path, max_total_bytes: int) -> tuple[dict[str, bytes], dict[str, str]]:
+def _read_bundle(path: Path, max_total_bytes: int, details: dict[str, Any] | None = None) -> tuple[dict[str, bytes], dict[str, str]]:
+    """The members and the files `bundle.json` lists. When `details` is given it receives `manifest_bytes`, `manifest_signature` (text or None) and `serial` (int or None)."""
     try:
         archive = zipfile.ZipFile(path)
     except (OSError, zipfile.BadZipFile) as exc:
@@ -129,12 +147,19 @@ def _read_bundle(path: Path, max_total_bytes: int) -> tuple[dict[str, bytes], di
             members[info.filename] = data
     if MANIFEST not in members:
         raise BundleError("the bundle has no bundle.json")
+    manifest_bytes = members.pop(MANIFEST)
+    manifest_signature = members.pop(MANIFEST_SIGNATURE, None)    # it signs bundle.json, so bundle.json does not list it
     try:
-        manifest = json.loads(members.pop(MANIFEST).decode("utf-8"))
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
     except (UnicodeDecodeError, ValueError) as exc:
         raise BundleError(f"bundle.json is not valid JSON: {exc}") from exc
     if not isinstance(manifest, dict) or manifest.get("format") != BUNDLE_FORMAT or not isinstance(manifest.get("files"), dict):
         raise BundleError(f"bundle.json must have format {BUNDLE_FORMAT} and a files object")
+    serial = manifest.get("serial")
+    if serial is not None and (isinstance(serial, bool) or not isinstance(serial, int) or serial < 1):
+        raise BundleError("the serial of the bundle is not a whole number above 0")
+    if details is not None:
+        details.update(manifest_bytes=manifest_bytes, manifest_signature=manifest_signature.decode("ascii", "replace") if manifest_signature is not None else None, serial=serial)
     listed = manifest["files"]
     if set(listed) != set(members):
         extra = sorted(set(members) ^ set(listed))[0]
@@ -157,15 +182,77 @@ def _newest(entries: list[ModelEntry]) -> dict[tuple[str, str], tuple[int, int, 
     return best
 
 
+def _read_serial(serial_file: Path) -> int | None:
+    try:
+        value = int(serial_file.read_text(encoding="ascii").strip())
+    except (OSError, ValueError):
+        return None
+    return value if value >= 1 else None
+
+
+def _journal_path(registry_path: Path) -> Path:
+    return registry_path.with_name(registry_path.name + JOURNAL_SUFFIX)
+
+
+def _write_atomically(destination: Path, data: bytes) -> None:
+    part = destination.with_name(destination.name + ".part")
+    part.write_bytes(data)
+    os.replace(part, destination)
+
+
+def _restore_models(models_dir: Path, overwritten: list[str]) -> list[str]:
+    """Put back the `.hef` files that an update replaced, from the copies it kept next to them."""
+    restored = []
+    for rel in overwritten:
+        target = models_dir / rel
+        previous = target.with_name(target.name + PREVIOUS_SUFFIX)
+        if previous.is_file():
+            shutil.copy2(previous, target.with_name(target.name + ".part"))
+            os.replace(target.with_name(target.name + ".part"), target)
+            previous.unlink()
+            restored.append(rel)
+    return restored
+
+
+def _forget_kept_models(registry_path: Path) -> None:
+    """A new update replaces what the one before it kept for the way back: the copies of the files it had replaced are removed."""
+    journal = _journal_path(registry_path)
+    if not journal.is_file():
+        return
+    try:
+        recorded = json.loads(journal.read_text(encoding="utf-8"))
+        root = Path(recorded["models_dir"])
+        for rel in recorded["overwritten"]:
+            target = root / rel
+            target.with_name(target.name + PREVIOUS_SUFFIX).unlink(missing_ok=True)
+    except (OSError, ValueError, KeyError, TypeError):
+        pass    # a journal that cannot be read is not a reason to stop the update; the copies stay where they are
+    journal.unlink(missing_ok=True)
+
+
 def apply_bundle(bundle_path: Path, registry_path: Path, models_dir: Path, public_key_file: Path | None, *, enabled: bool,
-                 allow_downgrade: bool = False, max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES) -> dict[str, Any]:
-    """Check the bundle and put it in place. Raises BundleError before touching anything when a check fails."""
+                 allow_downgrade: bool = False, max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES, require_serial: bool = False) -> dict[str, Any]:
+    """Check the bundle and put it in place. Raises BundleError before touching anything when a check fails.
+
+    With `require_serial` (off by default: bundles without a serial keep being accepted) the bundle must carry a serial that its signature covers, and the serial must be
+    higher than the last one this node applied (kept in `<registry>.serial`); `allow_downgrade` lets an older one through, as it does for the versions."""
     if not enabled:
         raise BundleError(f"the over-the-air update is off: pass --enable-ota or set {OTA_ENV}=1")
     if public_key_file is None:
         raise BundleError("an update is only applied with the public key of the owner of the registry (--public-key): an unsigned bundle is refused")
     registry_path, models_dir = Path(registry_path), Path(models_dir)
-    members, _ = _read_bundle(Path(bundle_path), max_total_bytes)
+    details: dict[str, Any] = {}
+    members, _ = _read_bundle(Path(bundle_path), max_total_bytes, details)
+    serial = details["serial"]
+    if serial is not None or require_serial:
+        if serial is None:
+            raise BundleError("this node requires a bundle with a serial and this one has none")
+        if details["manifest_signature"] is None:
+            raise BundleError("the bundle names a serial but bundle.json.sig is missing")
+        try:
+            verify_bytes(details["manifest_bytes"], details["manifest_signature"], public_key_file, "bundle.json")
+        except RegistryError as exc:
+            raise BundleError(str(exc)) from exc
     with tempfile.TemporaryDirectory(prefix="hef-bundle-") as stage_name:
         stage = Path(stage_name)
         (stage / REGISTRY).write_bytes(members[REGISTRY])
@@ -190,7 +277,11 @@ def apply_bundle(bundle_path: Path, registry_path: Path, models_dir: Path, publi
         if not target.is_relative_to(models_root):
             raise BundleError(f"models/{rel} would be written outside {models_dir}")
         targets[rel] = target
+    serial_file = registry_path.with_name(registry_path.name + SERIAL_SUFFIX)
     with registry_lock(registry_path):
+        last_serial = _read_serial(serial_file)
+        if require_serial and not allow_downgrade and last_serial is not None and serial is not None and serial <= last_serial:
+            raise BundleError(f"the serial {serial} is not higher than {last_serial}, the last one applied here: refused without --allow-downgrade")
         if registry_path.is_file() and not allow_downgrade:
             old = _newest(load_registry(registry_path))
             for key, version in _newest(entries).items():
@@ -199,30 +290,64 @@ def apply_bundle(bundle_path: Path, registry_path: Path, models_dir: Path, publi
             lost = sorted(k for k in old if k not in _newest(entries))
             if lost:
                 raise BundleError(f"the new registry no longer lists {lost[0][0]} ({lost[0][1]}): refused without --allow-downgrade")
-        installed = []
+        installed: list[str] = []
+        replaced: list[Path] = []
+        had_before: dict[Path, bool] = {}
+        overwritten: list[str] = []
+        _forget_kept_models(registry_path)
         for rel, target in targets.items():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            part = target.with_name(target.name + ".part")
-            part.write_bytes(packed[rel])
-            os.replace(part, target)
-            installed.append(rel)
+            if target.is_file():
+                shutil.copy2(target, target.with_name(target.name + PREVIOUS_SUFFIX))   # the file that is about to be replaced is kept
+                overwritten.append(rel)
         sig = signature_path(registry_path)
-        if registry_path.is_file():
-            shutil.copy2(registry_path, registry_path.with_name(registry_path.name + PREVIOUS_SUFFIX))
-        if sig.is_file():
-            shutil.copy2(sig, sig.with_name(sig.name + PREVIOUS_SUFFIX))
-        for source, destination in ((REGISTRY, registry_path), (REGISTRY + SIGNATURE_SUFFIX, sig)):
-            part = destination.with_name(destination.name + ".part")
-            part.write_bytes(members[source])
-            os.replace(part, destination)
-    return {"models": sorted(f"{e.name} {e.version}" for e in entries), "files": sorted(installed), "entries": len(entries)}
+        try:
+            # the journal is written before the first file is replaced: it says which files were replaced (and kept) and which were added
+            registry_path.parent.mkdir(parents=True, exist_ok=True)
+            _write_atomically(_journal_path(registry_path), json.dumps({"models_dir": str(models_dir), "overwritten": overwritten,
+                                                                          "added": [r for r in targets if r not in overwritten]}).encode("utf-8"))
+            for rel, target in targets.items():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                _write_atomically(target, packed[rel])
+                installed.append(rel)
+            had_before = {destination: destination.is_file() for destination in (registry_path, sig)}
+            if registry_path.is_file():
+                shutil.copy2(registry_path, registry_path.with_name(registry_path.name + PREVIOUS_SUFFIX))
+            if sig.is_file():
+                shutil.copy2(sig, sig.with_name(sig.name + PREVIOUS_SUFFIX))
+            for source, destination in ((REGISTRY, registry_path), (REGISTRY + SIGNATURE_SUFFIX, sig)):
+                _write_atomically(destination, members[source])
+                replaced.append(destination)
+            if serial is not None:
+                _write_atomically(serial_file, f"{serial}\n".encode("ascii"))
+        except BaseException:
+            # the update stopped half way (a full disk, a signal): the files it had replaced come back and the ones it had added go, so the node is as it was
+            for destination in replaced:
+                previous = destination.with_name(destination.name + PREVIOUS_SUFFIX)
+                if had_before[destination] and previous.is_file():
+                    shutil.copy2(previous, destination.with_name(destination.name + ".part"))
+                    os.replace(destination.with_name(destination.name + ".part"), destination)
+                elif not had_before[destination]:
+                    destination.unlink(missing_ok=True)
+            if serial is not None:
+                if last_serial is None:
+                    serial_file.unlink(missing_ok=True)
+                else:
+                    _write_atomically(serial_file, f"{last_serial}\n".encode("ascii"))
+            _restore_models(models_dir, overwritten)
+            for rel in installed:
+                if rel not in overwritten:
+                    targets[rel].unlink(missing_ok=True)
+            _journal_path(registry_path).unlink(missing_ok=True)
+            raise
+    return {"models": sorted(f"{e.name} {e.version}" for e in entries), "files": sorted(installed), "entries": len(entries), "serial": serial}
 
 
 def rollback_registry(registry_path: Path) -> list[str]:
-    """Put the registry and signature that `apply_bundle` kept (`.prev`) back. The `.hef` files that were added stay where they are."""
+    """Put the registry and signature that `apply_bundle` kept (`.prev`) back, and the `.hef` files that the update replaced (from the copies it kept).
+    The `.hef` files that were added stay where they are."""
     registry_path = Path(registry_path)
     sig = signature_path(registry_path)
-    restored = []
+    restored: list[str] = []
     with registry_lock(registry_path):
         for destination in (registry_path, sig):
             previous = destination.with_name(destination.name + PREVIOUS_SUFFIX)
@@ -234,6 +359,14 @@ def rollback_registry(registry_path: Path) -> list[str]:
             shutil.copy2(previous, part)
             os.replace(part, destination)
             restored.append(destination.name)
+        journal = _journal_path(registry_path)
+        if journal.is_file():
+            try:
+                recorded = json.loads(journal.read_text(encoding="utf-8"))
+                _restore_models(Path(recorded["models_dir"]), [str(rel) for rel in recorded["overwritten"]])   # the answer names the registry files, as before
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                raise BundleError(f"the registry was put back, but the journal of the update cannot be read, so its .hef files were not: {exc}") from exc
+            journal.unlink(missing_ok=True)
     return restored
 
 

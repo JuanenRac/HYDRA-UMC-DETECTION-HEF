@@ -34,6 +34,7 @@ from .compatibility import safe_load
 from .loaded import LoadedModels
 from .registry import (
     CHANNELS,
+    ChecksumCache,
     DEFAULT_CHANNEL,
     KNOWN_HAILO_ARCHS,
     RegistryError,
@@ -337,7 +338,9 @@ def _cmd_registry_record_accuracy(args: argparse.Namespace) -> int:
 
 def _cmd_registry_make_bundle(args: argparse.Namespace) -> int:
     try:
-        summary = make_bundle(Path(args.registry), Path(args.models_dir), Path(args.out), list(args.name))
+        key = getattr(args, "sign_with", None) or os.environ.get(SIGNING_KEY_ENV) or None
+        summary = make_bundle(Path(args.registry), Path(args.models_dir), Path(args.out), list(args.name),
+                              serial=getattr(args, "serial", None), signing_key=Path(key) if key and getattr(args, "serial", None) is not None else None)
     except RegistryError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -349,7 +352,7 @@ def _cmd_registry_apply_bundle(args: argparse.Namespace) -> int:
     try:
         summary = apply_bundle(
             Path(args.bundle), Path(args.registry), Path(args.models_dir), resolve_public_key(args.public_key),
-            enabled=ota_enabled(args.enable_ota), allow_downgrade=args.allow_downgrade,
+            enabled=ota_enabled(args.enable_ota), allow_downgrade=args.allow_downgrade, require_serial=bool(getattr(args, "require_bundle_serial", False)),
         )
     except RegistryError as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -391,6 +394,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
                             public_key_file=resolve_public_key(args.public_key), require_io_contract=_require_io(args), min_accuracy_ratio=ratio,
                             loaded=LoadedModels() if reports else None, token=token)
     server.identity_key = identity_key
+    if getattr(args, "checksum_cache", False):
+        server.checksum_cache = ChecksumCache()
     settings_path = settings_path_from(getattr(args, "settings_file", None))
     if settings_path is not None:
         server.settings = RuntimeSettings(settings_path, flag=reports)
@@ -492,6 +497,8 @@ def _build_parser() -> argparse.ArgumentParser:
     pack.add_argument("--models-dir", required=True, help="Directory containing the .hef files")
     pack.add_argument("--out", required=True, help="Bundle file to write")
     pack.add_argument("--name", action="append", default=[], help="Pack only the files of this model (repeat for several); default: all")
+    pack.add_argument("--serial", type=int, default=None, help="Number above 0 that grows with every bundle you make: it goes into the signed bundle.json so that a node can refuse an older bundle (needs --sign-with)")
+    pack.add_argument("--sign-with", default=None, metavar="PRIVATE_KEY", dest="sign_with", help="Ed25519 private key file that signs bundle.json when --serial is given (or HYDRA_UMC_DETECTION_HEF_SIGNING_KEY_FILE)")
     pack.set_defaults(func=_cmd_registry_make_bundle)
 
     apply = registry_sub.add_parser("apply-bundle", help="Check a signed bundle and put it in place (off unless --enable-ota or HYDRA_UMC_DETECTION_HEF_OTA=1).")
@@ -501,6 +508,7 @@ def _build_parser() -> argparse.ArgumentParser:
     apply.add_argument("--public-key", default=None, help="Ed25519 public key file of the owner of the registry (required)")
     apply.add_argument("--enable-ota", action="store_true", dest="enable_ota", help="Turn the update on for this command")
     apply.add_argument("--allow-downgrade", action="store_true", dest="allow_downgrade", help="Accept a bundle that goes to older versions or drops a model")
+    apply.add_argument("--require-bundle-serial", action="store_true", dest="require_bundle_serial", help="Refuse a bundle without a signed serial, or whose serial is not higher than the last one applied here (off by default; --allow-downgrade lets an older one through)")
     apply.set_defaults(func=_cmd_registry_apply_bundle)
 
     rollback = registry_sub.add_parser("rollback", help="Put the registry and signature that apply-bundle kept back.")
@@ -536,6 +544,7 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--stats-full-paths", action="store_true", help="let GET /stats show absolute paths instead of file names")
     serve.add_argument("--public-key", default=None, help="Ed25519 public key file; when set (or in HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE) the registry must carry a valid <registry>.sig")
     serve.add_argument("--require-io-contract", action="store_true", dest="require_io_contract", help="Treat an entry without an io_contract as an error and refuse to load one (off by default)")
+    serve.add_argument("--checksum-cache", action="store_true", dest="checksum_cache", help="Keep the SHA-256 of the model files that GET /registry/load checked while a file keeps its size and modification time, instead of reading it on every load (off by default: a file replaced by another with the same size and time would not be noticed)")
     serve.add_argument("--min-accuracy-ratio", type=float, default=None, dest="min_accuracy_ratio", help="Refuse to load a model whose quantized mAP@0.5 is below this share (above 0, at most 1) of its reference, or that has no measurement (off by default)")
     serve.add_argument("--accept-loaded-reports", action="store_true", dest="accept_loaded_reports", help="Turn on POST and GET /models/loaded (off by default): the nodes say which model they loaded and get a verdict against the registry")
     serve.add_argument("--settings-file", default=None, dest="settings_file", help="JSON file {\"acceptLoadedReports\": true|false} that HYDRA-UMC-SERVER writes and this process re-reads while it runs, to turn the loaded-model reports on and off without a restart (off by default; or set HYDRA_UMC_DETECTION_HEF_SETTINGS_FILE); a missing file leaves --accept-loaded-reports in force, a broken file turns the reports off")

@@ -28,7 +28,7 @@ from .access import authorized, bind_problem, reject
 from .compatibility import model_identity, safe_load
 from .loaded import LoadedModels, ReportError
 from .settings_file import RuntimeSettings
-from .registry import AmbiguousModelError, RegistryError, duplicate_versions, find_latest, load_registry
+from .registry import AmbiguousModelError, ChecksumCache, RegistryError, duplicate_versions, find_latest, load_registry
 
 
 def _write_json(handler: BaseHTTPRequestHandler, status: int, payload: object) -> None:
@@ -182,7 +182,8 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
         # (_load_registry()'s own 502, right above).
         try:
             result = safe_load(entry, self.server.models_dir, params["target_arch"],
-                               require_io_contract=self.server.require_io_contract, min_accuracy_ratio=self.server.min_accuracy_ratio)
+                               require_io_contract=self.server.require_io_contract, min_accuracy_ratio=self.server.min_accuracy_ratio,
+                               checksum_cache=self.server.checksum_cache)
         except RegistryError as e:
             _write_error(self, 502, f"could not safe-load model: {e}")
             return
@@ -237,6 +238,7 @@ class RegistryServer(ThreadingHTTPServer):
     loaded: LoadedModels | None
     token: str
     _reports_lock: threading.Lock
+    checksum_cache: ChecksumCache | None = None  # `serve --checksum-cache`: the hashes of model files that did not change (registry.py); None hashes the file on every load
     settings: RuntimeSettings | None = None  # the settings file that switches the reports while the service runs (settings_file.py)
 
     def reports(self) -> LoadedModels | None:

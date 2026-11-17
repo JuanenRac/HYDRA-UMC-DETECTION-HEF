@@ -369,3 +369,152 @@ def test_the_load_route_carries_the_identity_and_applies_the_gates(tmp_path: Pat
     finally:
         plain.shutdown()
         plain.server_close()
+
+
+def _rebuilt_publisher(tmp_path: Path, registry: Path, models: Path, private: Path) -> None:
+    """The owner rebuilds model 0.1.0 (new bytes, same file name) and adds 0.3.0."""
+    rebuilt, added = b"model 0.1.0 rebuilt", b"model 0.3.0"
+    (models / "pcb-0.1.0.hef").write_bytes(rebuilt)
+    (models / "pcb-0.3.0.hef").write_bytes(added)
+    registry.write_text(json.dumps([_entry("0.1.0", rebuilt), _entry("0.2.0", b"model 0.2.0"), _entry("0.3.0", added)]), encoding="utf-8")
+    sign_registry(registry, private)
+
+
+def _node_state(node_registry: Path, node_models: Path) -> dict[str, bytes]:
+    files = {path.name: path.read_bytes() for path in sorted(node_models.glob("*.hef"))}
+    files["registry"] = node_registry.read_bytes()
+    files["signature"] = node_registry.with_name("registry.json.sig").read_bytes()
+    return files
+
+
+def test_the_way_back_puts_the_replaced_model_files_back(tmp_path: Path) -> None:
+    registry, models, private, public = _publisher(tmp_path, ("0.1.0", "0.2.0"))
+    node_registry, node_models = _node(tmp_path)
+    apply_bundle(_bundle(tmp_path, registry, models), node_registry, node_models, public, enabled=True)
+    before = _node_state(node_registry, node_models)
+    _rebuilt_publisher(tmp_path, registry, models, private)
+    apply_bundle(_bundle(tmp_path, registry, models, out="two.zip"), node_registry, node_models, public, enabled=True)
+    assert (node_models / "pcb-0.1.0.hef").read_bytes() == b"model 0.1.0 rebuilt" and (node_models / "pcb-0.3.0.hef").is_file()
+    assert rollback_registry(node_registry) == ["registry.json", "registry.json.sig"]
+    assert (node_models / "pcb-0.1.0.hef").read_bytes() == b"model 0.1.0"
+    assert (node_models / "pcb-0.3.0.hef").is_file()                      # what an update added stays where it is
+    assert {k: v for k, v in _node_state(node_registry, node_models).items() if k != "pcb-0.3.0.hef"} == before
+    assert not node_registry.with_name("registry.json.apply.journal").exists()
+
+
+@pytest.mark.parametrize("cut", [1, 2, 3, 4, 5, 6])
+def test_an_update_cut_at_any_point_leaves_the_node_as_it_was(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cut: int) -> None:
+    import os
+
+    registry, models, private, public = _publisher(tmp_path, ("0.1.0", "0.2.0"))
+    node_registry, node_models = _node(tmp_path)
+    apply_bundle(_bundle(tmp_path, registry, models), node_registry, node_models, public, enabled=True)
+    before = _node_state(node_registry, node_models)
+    _rebuilt_publisher(tmp_path, registry, models, private)
+    bundle = _bundle(tmp_path, registry, models, out="two.zip")
+    real, calls = os.replace, []
+
+    def replace(source, destination):
+        calls.append(destination)
+        if len(calls) == cut:                  # the journal, the three model files, the registry, its signature: the call number `cut` fails
+            raise OSError("disk full")
+        return real(source, destination)
+
+    monkeypatch.setattr("hydra_umc_detection_hef.bundle.os.replace", replace)
+    with pytest.raises(OSError, match="disk full"):
+        apply_bundle(bundle, node_registry, node_models, public, enabled=True)
+    monkeypatch.undo()
+    assert _node_state(node_registry, node_models) == before              # the replaced files are back, the added one is gone, the registry is the old one
+    assert not node_registry.with_name("registry.json.apply.journal").exists()
+    assert not list(node_models.glob("*.prev"))
+
+
+def test_a_new_update_forgets_the_copies_of_the_one_before(tmp_path: Path) -> None:
+    registry, models, private, public = _publisher(tmp_path, ("0.1.0", "0.2.0"))
+    node_registry, node_models = _node(tmp_path)
+    apply_bundle(_bundle(tmp_path, registry, models), node_registry, node_models, public, enabled=True)
+    _rebuilt_publisher(tmp_path, registry, models, private)
+    apply_bundle(_bundle(tmp_path, registry, models, out="two.zip"), node_registry, node_models, public, enabled=True)
+    assert (node_models / "pcb-0.1.0.hef.prev").read_bytes() == b"model 0.1.0"
+    apply_bundle(_bundle(tmp_path, registry, models, out="three.zip"), node_registry, node_models, public, enabled=True)
+    assert (node_models / "pcb-0.1.0.hef.prev").read_bytes() == b"model 0.1.0 rebuilt"   # the copy now is the file of the update before
+
+
+def _serial_bundle(tmp_path: Path, registry: Path, models: Path, private: Path, serial: int, out: str) -> Path:
+    path = tmp_path / out
+    make_bundle(registry, models, path, serial=serial, signing_key=private)
+    return path
+
+
+def test_a_bundle_with_a_signed_serial_is_not_applied_again_when_the_node_asks_for_it(tmp_path: Path) -> None:
+    registry, models, private, public = _publisher(tmp_path)
+    node_registry, node_models = _node(tmp_path)
+    first = _serial_bundle(tmp_path, registry, models, private, 5, "five.zip")
+    assert apply_bundle(first, node_registry, node_models, public, enabled=True, require_serial=True)["serial"] == 5
+    assert node_registry.with_name("registry.json.serial").read_text(encoding="ascii").strip() == "5"
+    with pytest.raises(BundleError, match="not higher than 5"):
+        apply_bundle(first, node_registry, node_models, public, enabled=True, require_serial=True)       # the same bundle again
+    with pytest.raises(BundleError, match="not higher than 5"):
+        apply_bundle(_serial_bundle(tmp_path, registry, models, private, 4, "four.zip"), node_registry, node_models, public, enabled=True, require_serial=True)
+    apply_bundle(_serial_bundle(tmp_path, registry, models, private, 4, "four2.zip"), node_registry, node_models, public, enabled=True, require_serial=True, allow_downgrade=True)
+    assert apply_bundle(_serial_bundle(tmp_path, registry, models, private, 6, "six.zip"), node_registry, node_models, public, enabled=True, require_serial=True)["serial"] == 6
+
+
+def test_without_the_option_old_bundles_and_bundles_without_a_serial_keep_working(tmp_path: Path) -> None:
+    registry, models, private, public = _publisher(tmp_path)
+    node_registry, node_models = _node(tmp_path)
+    apply_bundle(_bundle(tmp_path, registry, models), node_registry, node_models, public, enabled=True)
+    assert not node_registry.with_name("registry.json.serial").exists()
+    bundle = _serial_bundle(tmp_path, registry, models, private, 3, "three.zip")
+    apply_bundle(bundle, node_registry, node_models, public, enabled=True)
+    apply_bundle(bundle, node_registry, node_models, public, enabled=True)                                # not required: the repeat is let through
+    with pytest.raises(BundleError, match="requires a bundle with a serial"):
+        apply_bundle(_bundle(tmp_path, registry, models, out="plain.zip"), node_registry, node_models, public, enabled=True, require_serial=True)
+
+
+def test_a_serial_that_the_signature_does_not_cover_is_refused(tmp_path: Path) -> None:
+    registry, models, private, public = _publisher(tmp_path)
+    node_registry, node_models = _node(tmp_path)
+    bundle = _serial_bundle(tmp_path, registry, models, private, 2, "two.zip")
+    with zipfile.ZipFile(bundle) as source:
+        members = {name: source.read(name) for name in source.namelist()}
+    forged = json.loads(members["bundle.json"])
+    forged["serial"] = 99
+    tampered = dict(members, **{"bundle.json": json.dumps(forged, indent=2, sort_keys=True).encode()})
+    with zipfile.ZipFile(tmp_path / "forged.zip", "w") as out:
+        for name, data in tampered.items():
+            out.writestr(name, data)
+    with pytest.raises(BundleError, match="signature of bundle.json does not match"):
+        apply_bundle(tmp_path / "forged.zip", node_registry, node_models, public, enabled=True)
+    without = {name: data for name, data in members.items() if name != "bundle.json.sig"}
+    with zipfile.ZipFile(tmp_path / "unsigned.zip", "w") as out:
+        for name, data in without.items():
+            out.writestr(name, data)
+    with pytest.raises(BundleError, match="bundle.json.sig is missing"):
+        apply_bundle(tmp_path / "unsigned.zip", node_registry, node_models, public, enabled=True)
+    assert not node_registry.exists()                                                                   # nothing was touched
+
+
+def test_a_serial_needs_a_whole_number_and_a_key(tmp_path: Path) -> None:
+    registry, models, private, _public = _publisher(tmp_path)
+    for bad in (0, -1, True):
+        with pytest.raises(BundleError, match="whole number above 0"):
+            make_bundle(registry, models, tmp_path / "x.zip", serial=bad, signing_key=private)    # type: ignore[arg-type]
+    with pytest.raises(BundleError, match="private key"):
+        make_bundle(registry, models, tmp_path / "x.zip", serial=1)
+
+
+def test_the_command_line_makes_and_applies_a_bundle_with_a_serial(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    registry, models, private, public = _publisher(tmp_path)
+    node_registry, node_models = _node(tmp_path)
+    out = tmp_path / "cli.zip"
+
+    def run(*argv: str) -> int:
+        monkeypatch.setattr("sys.argv", ["prog", *argv])
+        return main()
+
+    assert run("registry", "make-bundle", "--registry", str(registry), "--models-dir", str(models), "--out", str(out), "--serial", "7", "--sign-with", str(private)) == 0
+    args = ("registry", "apply-bundle", "--bundle", str(out), "--registry", str(node_registry), "--models-dir", str(node_models), "--public-key", str(public), "--enable-ota", "--require-bundle-serial")
+    assert run(*args) == 0
+    capsys.readouterr()
+    assert run(*args) == 1 and "not higher than 7" in capsys.readouterr().err

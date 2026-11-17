@@ -92,6 +92,23 @@ def sign_registry(registry_path: Path, private_key_file: Path) -> Path:
     return target
 
 
+def sign_bytes(data: bytes, private_key_file: Path) -> str:
+    """The Ed25519 signature of these bytes, in hex (the manifest of a bundle)."""
+    ed25519, _ = _ed25519()
+    return ed25519.Ed25519PrivateKey.from_private_bytes(read_key(private_key_file)).sign(data).hex()
+
+
+def verify_bytes(data: bytes, signature_text: str, public_key_file: Path, what: str) -> None:
+    """Raise RegistryError unless `signature_text` (hex) is a valid signature of exactly these bytes."""
+    ed25519, InvalidSignature = _ed25519()
+    signature = _decode_hex(signature_text, 64, f"signature of {what}")
+    public = ed25519.Ed25519PublicKey.from_public_bytes(read_key(public_key_file))
+    try:
+        public.verify(signature, data)
+    except InvalidSignature as exc:
+        raise RegistryError(f"the signature of {what} does not match its content and the public key") from exc
+
+
 def verify_registry_bytes(data: bytes, registry_path: Path, public_key_file: Path) -> None:
     """Raise RegistryError unless `<registry>.sig` is a valid signature of exactly these bytes."""
     ed25519, InvalidSignature = _ed25519()
