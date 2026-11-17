@@ -172,6 +172,8 @@ ONNX にエクスポートされ、Hailo Dataflow Compiler を通じて INT8/INT
 | `GET /stats` | 稼働状況 |
 | `registry validate \| latest \| load \| add` | `--registry`, `--models-dir`, `--hef-path`, `--name`, `--version X.Y.Z`, `--task`, `--input-shape 640,640,3`, `--classes`, `--hailo-arch` |
 | `serve` | `--registry FILE --models-dir DIR --addr 127.0.0.1 --port 8093` |
+| `serve --checksum-cache` | 既定ではオフ。ロードゲートが確認した各モデルファイルの SHA-256 を、パス・サイズ・更新時刻が変わらない間（最大 64 ファイル）保持し、大きなファイルを読み直さずに済ませます。同じサイズと時刻の別ファイルに差し替えられても気づけないため、既定はオフです |
+| `registry make-bundle --serial N --sign-with KEY`、`registry apply-bundle --require-bundle-serial` | 前者は増え続けるシリアルを `bundle.json` に入れ、`bundle.json.sig` として署名します。後者（既定はオフ）は、検証できるシリアルのないバンドルや、最後に適用したものより大きくないシリアルのバンドルを拒否します。`--allow-downgrade` で古いものも通せます |
 
 ## ⚙️ 設定
 

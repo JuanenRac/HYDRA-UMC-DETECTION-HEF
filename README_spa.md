@@ -157,6 +157,8 @@ HTTP en `127.0.0.1:8093` por defecto (solo lectura) y una línea de órdenes. La
 | `GET /stats` | salud |
 | `registry validate \| latest \| load \| add` | `--registry`, `--models-dir`, `--hef-path`, `--name`, `--version X.Y.Z`, `--task`, `--input-shape 640,640,3`, `--classes`, `--hailo-arch` |
 | `serve` | `--registry FICHERO --models-dir DIR --addr 127.0.0.1 --port 8093` |
+| `serve --checksum-cache` | apagado por defecto: guarda el SHA-256 de cada fichero de modelo que comprobó la puerta de carga mientras su ruta, tamaño y hora de modificación no cambien (como mucho 64 ficheros), así un fichero grande no se vuelve a leer; apagado porque un fichero cambiado por otro del mismo tamaño y hora pasaría inadvertido |
+| `registry make-bundle --serial N --sign-with KEY`, `registry apply-bundle --require-bundle-serial` | el primero pone un número de serie creciente en `bundle.json` y lo firma como `bundle.json.sig`; el segundo (apagado por defecto) rechaza un paquete sin serie que verifique, o cuya serie no sea mayor que la última aplicada; `--allow-downgrade` deja pasar uno más antiguo |
 
 ## ⚙️ Configuración
 

@@ -166,6 +166,8 @@ INT8/INT4 量化（生成 `.har`），最后打包为 [HYDRA-UMC-VISION-NODE](ht
 | `GET /stats` | 健康状态 |
 | `registry validate \| latest \| load \| add` | `--registry`, `--models-dir`, `--hef-path`, `--name`, `--version X.Y.Z`, `--task`, `--input-shape 640,640,3`, `--classes`, `--hailo-arch` |
 | `serve` | `--registry FILE --models-dir DIR --addr 127.0.0.1 --port 8093` |
+| `serve --checksum-cache` | 默认关闭：只要路径、大小和修改时间不变，就保留加载关口已检查的每个模型文件的 SHA-256（最多 64 个文件），因此大文件不会被重复读取；默认关闭是因为被同样大小和时间的另一个文件替换时不会被发现 |
+| `registry make-bundle --serial N --sign-with KEY`、`registry apply-bundle --require-bundle-serial` | 前者在 `bundle.json` 中写入递增的序列号并签名为 `bundle.json.sig`；后者（默认关闭）拒绝没有可验证序列号的包，或序列号不高于上次应用的包；`--allow-downgrade` 允许更旧的包通过 |
 
 ## ⚙️ 配置
 
