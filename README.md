@@ -157,6 +157,8 @@ HTTP on `127.0.0.1:8093` by default (read only) and a command line. The full ref
 | `GET /stats` | health |
 | `registry validate \| latest \| load \| add` | `--registry`, `--models-dir`, `--hef-path`, `--name`, `--version X.Y.Z`, `--task`, `--input-shape 640,640,3`, `--classes`, `--hailo-arch` |
 | `serve` | `--registry FILE --models-dir DIR --addr 127.0.0.1 --port 8093` |
+| `serve --checksum-cache` | off by default: keeps the SHA-256 of each model file the load gate checked, while its path, size and modification time stay the same (at most 64 files), so a large file is not read again; off because a file swapped for another of the same size and time would not be noticed |
+| `registry make-bundle --serial N --sign-with KEY`, `registry apply-bundle --require-bundle-serial` | the first puts a rising serial in `bundle.json` and signs it as `bundle.json.sig`; the second (off by default) refuses a bundle without a serial that verifies, or whose serial is not higher than the last one applied; `--allow-downgrade` lets an older one through |
 
 ## ⚙️ Configuration
 

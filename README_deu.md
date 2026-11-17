@@ -157,6 +157,8 @@ HTTP standardmäßig auf `127.0.0.1:8093` (schreibgeschützt) und eine Kommandoz
 | `GET /stats` | Gesundheit |
 | `registry validate \| latest \| load \| add` | `--registry`, `--models-dir`, `--hef-path`, `--name`, `--version X.Y.Z`, `--task`, `--input-shape 640,640,3`, `--classes`, `--hailo-arch` |
 | `serve` | `--registry DATEI --models-dir VERZ --addr 127.0.0.1 --port 8093` |
+| `serve --checksum-cache` | standardmäßig aus: behält den SHA-256 jeder Modelldatei, die das Ladetor geprüft hat, solange Pfad, Größe und Änderungszeit gleich bleiben (höchstens 64 Dateien), sodass eine große Datei nicht erneut gelesen wird; aus, weil eine gegen eine andere mit gleicher Größe und Zeit getauschte Datei unbemerkt bliebe |
+| `registry make-bundle --serial N --sign-with KEY`, `registry apply-bundle --require-bundle-serial` | das erste setzt eine steigende Seriennummer in `bundle.json` und signiert es als `bundle.json.sig`; das zweite (standardmäßig aus) lehnt ein Bundle ohne verifizierbare Seriennummer ab oder eines, dessen Nummer nicht höher als die zuletzt angewendete ist; `--allow-downgrade` lässt ein älteres durch |
 
 ## ⚙️ Konfiguration
 
