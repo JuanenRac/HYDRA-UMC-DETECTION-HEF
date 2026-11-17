@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The service can remember the hash of a model file that did not change (`serve --checksum-cache`, off):** `GET /registry/load` then checks a large `.hef` once and not on every call, as long as the file keeps its path, size and modification time to the nanosecond; at most 64 files are remembered and the cache forgets an older state of a file when it sees a new one. It is off by default, and the load that returns the bytes (`keep_bytes`) always hashes the bytes it hands over. Tests cover the hit, the change of size and of time, the limit and the switch.
 
 ## [0.2.1]
 

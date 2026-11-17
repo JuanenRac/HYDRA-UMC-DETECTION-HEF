@@ -34,6 +34,7 @@ from .compatibility import safe_load
 from .loaded import LoadedModels
 from .registry import (
     CHANNELS,
+    ChecksumCache,
     DEFAULT_CHANNEL,
     KNOWN_HAILO_ARCHS,
     RegistryError,
@@ -391,6 +392,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
                             public_key_file=resolve_public_key(args.public_key), require_io_contract=_require_io(args), min_accuracy_ratio=ratio,
                             loaded=LoadedModels() if reports else None, token=token)
     server.identity_key = identity_key
+    if getattr(args, "checksum_cache", False):
+        server.checksum_cache = ChecksumCache()
     settings_path = settings_path_from(getattr(args, "settings_file", None))
     if settings_path is not None:
         server.settings = RuntimeSettings(settings_path, flag=reports)
@@ -536,6 +539,7 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--stats-full-paths", action="store_true", help="let GET /stats show absolute paths instead of file names")
     serve.add_argument("--public-key", default=None, help="Ed25519 public key file; when set (or in HYDRA_UMC_DETECTION_HEF_PUBLIC_KEY_FILE) the registry must carry a valid <registry>.sig")
     serve.add_argument("--require-io-contract", action="store_true", dest="require_io_contract", help="Treat an entry without an io_contract as an error and refuse to load one (off by default)")
+    serve.add_argument("--checksum-cache", action="store_true", dest="checksum_cache", help="Keep the SHA-256 of the model files that GET /registry/load checked while a file keeps its size and modification time, instead of reading it on every load (off by default: a file replaced by another with the same size and time would not be noticed)")
     serve.add_argument("--min-accuracy-ratio", type=float, default=None, dest="min_accuracy_ratio", help="Refuse to load a model whose quantized mAP@0.5 is below this share (above 0, at most 1) of its reference, or that has no measurement (off by default)")
     serve.add_argument("--accept-loaded-reports", action="store_true", dest="accept_loaded_reports", help="Turn on POST and GET /models/loaded (off by default): the nodes say which model they loaded and get a verdict against the registry")
     serve.add_argument("--settings-file", default=None, dest="settings_file", help="JSON file {\"acceptLoadedReports\": true|false} that HYDRA-UMC-SERVER writes and this process re-reads while it runs, to turn the loaded-model reports on and off without a restart (off by default; or set HYDRA_UMC_DETECTION_HEF_SETTINGS_FILE); a missing file leaves --accept-loaded-reports in force, a broken file turns the reports off")

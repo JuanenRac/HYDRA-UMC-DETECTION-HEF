@@ -24,7 +24,7 @@ import enum
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .registry import ModelEntry, accuracy_ratio, io_contract_sha256, read_verified
+from .registry import ChecksumCache, ModelEntry, accuracy_ratio, io_contract_sha256, read_verified
 
 
 class LoadOutcome(enum.Enum):
@@ -67,7 +67,7 @@ def check_arch_compatibility(entry: ModelEntry, target_arch: str) -> bool:
 
 def safe_load(
     entry: ModelEntry, models_dir: Path, target_arch: str, keep_bytes: bool = False, *,
-    require_io_contract: bool = False, min_accuracy_ratio: float | None = None,
+    require_io_contract: bool = False, min_accuracy_ratio: float | None = None, checksum_cache: ChecksumCache | None = None,
 ) -> LoadResult:
     """The real, combined safe-load decision for one registry entry.
 
@@ -110,7 +110,7 @@ def safe_load(
                 detail=f"the quantized model of {entry.name} {entry.version} scores {ratio:.3f} of the reference, below the minimum {min_accuracy_ratio:g}",
             )
 
-    checksum_ok, data = read_verified(entry, models_dir)
+    checksum_ok, data = read_verified(entry, models_dir, cache=checksum_cache, want_data=keep_bytes)
     if checksum_ok is None:
         return LoadResult(
             outcome=LoadOutcome.REJECTED_MISSING_FILE,

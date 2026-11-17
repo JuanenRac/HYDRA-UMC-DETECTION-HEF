@@ -474,6 +474,7 @@ it is off by default so that registries written before keep loading. `latest` an
 `registry record-accuracy --registry PATH --name NAME --version X.Y.Z --detections FILE --truth FILE (--reference-map N | --reference-detections FILE)` computes the mAP@0.5 of the
 detections of the compiled model against the true boxes and writes the `accuracy` block of the entry (`metric`, `quantized`, `reference`, `dataset_sha256`, `samples`); sign the registry again afterwards.
 Both files are `{"images": {"name": [{"class_id": 0, "score": 0.9, "box": {"x_min": 1, "y_min": 2, "x_max": 30, "y_max": 40}}]}}`, the truth without `score`.
+`serve --checksum-cache` keeps the SHA-256 of each model file that `GET /registry/load` checked, for as long as the file keeps its path, size and modification time (to the nanosecond), so a large file is not read again on every load; it is off by default because a file replaced by another with the same size and time would not be noticed, and at most 64 files are remembered.
 `registry load --min-accuracy-ratio R` (and `serve --min-accuracy-ratio R`) refuses with `REJECTED_ACCURACY` a model whose quantized score is under R times its reference or that has no measurement.
 
 `registry make-bundle --registry PATH --models-dir DIR --out FILE [--name NAME ...]` writes the update bundle (the signed registry, the `.hef` files of the models chosen and `bundle.json` with the SHA-256 of

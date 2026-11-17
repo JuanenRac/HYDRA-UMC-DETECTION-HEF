@@ -24,6 +24,7 @@ import math
 import os
 import re
 import tempfile
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -507,7 +508,40 @@ def compute_sha256(file_path: Path) -> str:
     return digest.hexdigest()
 
 
-def read_verified(entry: ModelEntry, models_dir: Path) -> tuple[bool | None, bytes | None]:
+class ChecksumCache:
+    """The SHA-256 of model files that were already hashed, kept while the file keeps its path, size and modification time.
+
+    It lets `GET /registry/load` answer without reading a large file again. A file that is replaced by another of the same size and the same
+    modification time (to the nanosecond) would not be noticed, which is why the service turns it on only when it is asked to (`serve --checksum-cache`).
+    """
+
+    def __init__(self, max_entries: int = 64) -> None:
+        self._max = max_entries
+        self._known: dict[tuple[str, int, int], str] = {}
+        self._lock = threading.Lock()
+        self.hits = 0
+        self.misses = 0
+
+    def sha256(self, file_path: Path) -> str:
+        info = file_path.stat()
+        key = (str(file_path), info.st_size, info.st_mtime_ns)
+        with self._lock:
+            known = self._known.get(key)
+            if known is not None:
+                self.hits += 1
+                return known
+            self.misses += 1
+        digest = compute_sha256(file_path)
+        with self._lock:
+            for old in [k for k in self._known if k[0] == key[0]]:
+                del self._known[old]     # an older state of the same file is no use any more
+            while len(self._known) >= self._max:
+                del self._known[next(iter(self._known))]
+            self._known[key] = digest
+        return digest
+
+
+def read_verified(entry: ModelEntry, models_dir: Path, *, cache: ChecksumCache | None = None, want_data: bool = True) -> tuple[bool | None, bytes | None]:
     """Like `verify_checksum`, but reads the file ONCE and returns the bytes that were hashed: `(None, None)` when the
     file is absent, `(False, None)` when the hash differs, `(True, data)` when it matches. A consumer that loads `data`
     (instead of opening the path again later) cannot get a file that changed, or a symlink that was repointed, between
@@ -520,6 +554,9 @@ def read_verified(entry: ModelEntry, models_dir: Path) -> tuple[bool | None, byt
         )
     if not file_path.is_file():
         return None, None
+    if cache is not None and not want_data:
+        # the caller does not use the bytes: the hash is enough, and a file that did not change since it was hashed is not read again
+        return cache.sha256(file_path) == entry.sha256, None
     data = file_path.read_bytes()
     if hashlib.sha256(data).hexdigest() != entry.sha256:
         return False, None
